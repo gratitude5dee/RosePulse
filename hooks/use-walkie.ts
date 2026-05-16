@@ -60,13 +60,56 @@ interface UseWalkieOptions {
   onAutoStop?: () => void;
 }
 
+interface TranscriptionResponse {
+  text: string;
+  model?: string;
+}
+
 export type WalkiePermissionState = "unknown" | "granted" | "denied" | "unsupported";
+
+const AUDIO_MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/aac",
+  "audio/ogg;codecs=opus"
+];
+
+const TRANSCRIPTION_FAILURE_COPY = "Transcription failed. Try again or type the note before saving.";
+
+function getSupportedRecordingMimeType() {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
+    return "";
+  }
+
+  return AUDIO_MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+}
+
+function getAudioExtension(mimeType: string) {
+  if (mimeType.includes("mp4")) return "m4a";
+  if (mimeType.includes("aac")) return "aac";
+  if (mimeType.includes("ogg")) return "ogg";
+  return "webm";
+}
+
+function isTranscriptionResponse(value: unknown): value is TranscriptionResponse {
+  return Boolean(value && typeof value === "object" && "text" in value && typeof value.text === "string");
+}
+
+function readApiError(value: unknown) {
+  if (!value || typeof value !== "object" || !("error" in value)) return null;
+  const error = value.error;
+  return typeof error === "string" ? error : null;
+}
 
 export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [serverTranscriptionSupported, setServerTranscriptionSupported] = useState(true);
   const [micSupported, setMicSupported] = useState(true);
   const [secureContext, setSecureContext] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [permissionState, setPermissionState] = useState<WalkiePermissionState>("unknown");
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [interimTranscript, setInterimTranscript] = useState("");
@@ -74,6 +117,10 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const lastRecordingRef = useRef<Blob | null>(null);
+  const speechSupportedRef = useRef(true);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -81,6 +128,15 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   const autoStopRef = useRef<number | null>(null);
   const elapsedRef = useRef<number | null>(null);
   const lastSampleAtRef = useRef(0);
+  const transcriptionRequestRef = useRef(0);
+
+  useEffect(() => {
+    speechSupportedRef.current = speechSupported;
+  }, [speechSupported]);
+
+  useEffect(() => {
+    setServerTranscriptionSupported(typeof MediaRecorder !== "undefined");
+  }, []);
 
   useEffect(() => {
     const canUseMic = Boolean(navigator.mediaDevices?.getUserMedia) && window.isSecureContext;
@@ -94,6 +150,7 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
     if (!Recognition) {
       setSpeechSupported(false);
+      speechSupportedRef.current = false;
       return;
     }
 
@@ -126,6 +183,7 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     };
     recognition.onerror = (event) => {
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        speechSupportedRef.current = false;
         setSpeechSupported(false);
       }
       setInterimTranscript("");
@@ -134,6 +192,7 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
       setInterimTranscript("");
     };
     setSpeechSupported(true);
+    speechSupportedRef.current = true;
     recognitionRef.current = recognition;
 
     return () => {
@@ -159,6 +218,17 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     setAudioLevel(0);
   }, []);
 
+  const clearTimers = useCallback(() => {
+    if (autoStopRef.current !== null) {
+      window.clearTimeout(autoStopRef.current);
+      autoStopRef.current = null;
+    }
+    if (elapsedRef.current !== null) {
+      window.clearInterval(elapsedRef.current);
+      elapsedRef.current = null;
+    }
+  }, []);
+
   const sampleAudio = useCallback((time?: number) => {
     const analyser = analyserRef.current;
     if (!analyser) return;
@@ -176,6 +246,137 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     }
     frameRef.current = requestAnimationFrame(sampleAudio);
   }, []);
+
+  const transcribeRecording = useCallback(
+    async (recording: Blob) => {
+      if (recording.size === 0) {
+        setTranscriptionError("No audio was captured. Hold the mic and try again.");
+        return;
+      }
+
+      lastRecordingRef.current = recording;
+      const requestId = transcriptionRequestRef.current + 1;
+      transcriptionRequestRef.current = requestId;
+      setIsTranscribing(true);
+      setTranscriptionError(null);
+
+      const mimeType = recording.type || "audio/webm";
+      const formData = new FormData();
+      formData.append("audio", recording, `walkie-${Date.now()}.${getAudioExtension(mimeType)}`);
+      formData.append("lang", lang ?? navigator.language ?? "en-US");
+
+      try {
+        const response = await fetch("/api/walkie/transcribe", {
+          method: "POST",
+          body: formData
+        });
+        const payload: unknown = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(readApiError(payload) ?? TRANSCRIPTION_FAILURE_COPY);
+        }
+
+        if (!isTranscriptionResponse(payload)) {
+          throw new Error("Transcription returned an unexpected response. Type the note before saving.");
+        }
+
+        const text = payload.text.trim();
+        if (!text) {
+          throw new Error("No speech was detected. Type the note before saving.");
+        }
+
+        if (transcriptionRequestRef.current !== requestId) return;
+        setSegments((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            text,
+            at: new Date().toISOString(),
+            isFinal: true
+          }
+        ]);
+        setInterimTranscript("");
+        setTranscriptionError(null);
+      } catch (error) {
+        if (transcriptionRequestRef.current === requestId) {
+          setTranscriptionError(error instanceof Error ? error.message : TRANSCRIPTION_FAILURE_COPY);
+        }
+      } finally {
+        if (transcriptionRequestRef.current === requestId) {
+          setIsTranscribing(false);
+        }
+      }
+    },
+    [lang]
+  );
+
+  const beginMediaRecording = useCallback((stream: MediaStream) => {
+    if (typeof MediaRecorder === "undefined") {
+      setServerTranscriptionSupported(false);
+      return;
+    }
+
+    try {
+      const mimeType = getSupportedRecordingMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onerror = () => {
+        setServerTranscriptionSupported(false);
+        setTranscriptionError("Audio recording failed. Type the note before saving.");
+      };
+      recorder.start(250);
+      mediaRecorderRef.current = recorder;
+      setServerTranscriptionSupported(true);
+    } catch {
+      mediaRecorderRef.current = null;
+      recordedChunksRef.current = [];
+      setServerTranscriptionSupported(false);
+    }
+  }, []);
+
+  const finishMediaRecording = useCallback(
+    (shouldTranscribe: boolean) => {
+      const recorder = mediaRecorderRef.current;
+      mediaRecorderRef.current = null;
+
+      if (!recorder) {
+        stopAudio();
+        return;
+      }
+
+      const finalizeRecording = () => {
+        const mimeType = recorder.mimeType || recordedChunksRef.current[0]?.type || "audio/webm";
+        const recording = new Blob(recordedChunksRef.current, { type: mimeType });
+        recordedChunksRef.current = [];
+        stopAudio();
+        if (shouldTranscribe) {
+          void transcribeRecording(recording);
+        }
+      };
+
+      recorder.onstop = finalizeRecording;
+      try {
+        if (recorder.state === "inactive") {
+          finalizeRecording();
+          return;
+        }
+        recorder.requestData();
+        recorder.stop();
+      } catch {
+        recordedChunksRef.current = [];
+        stopAudio();
+        if (shouldTranscribe) {
+          setTranscriptionError(TRANSCRIPTION_FAILURE_COPY);
+        }
+      }
+    },
+    [stopAudio, transcribeRecording]
+  );
 
   const requestMic = useCallback(async () => {
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -217,6 +418,7 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
       audioContext.createMediaStreamSource(stream).connect(analyser);
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
+      beginMediaRecording(stream);
       setPermissionState("granted");
       setMicSupported(true);
       lastSampleAtRef.current = 0;
@@ -229,7 +431,7 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
       stopAudio();
       return false;
     }
-  }, [sampleAudio, stopAudio]);
+  }, [beginMediaRecording, sampleAudio, stopAudio]);
 
   const stop = useCallback(() => {
     try {
@@ -238,19 +440,13 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
       recognitionRef.current?.abort();
     }
     setIsRecording(false);
-    stopAudio();
-    if (autoStopRef.current !== null) {
-      window.clearTimeout(autoStopRef.current);
-      autoStopRef.current = null;
-    }
-    if (elapsedRef.current !== null) {
-      window.clearInterval(elapsedRef.current);
-      elapsedRef.current = null;
-    }
-  }, [stopAudio]);
+    clearTimers();
+    finishMediaRecording(!speechSupportedRef.current && serverTranscriptionSupported);
+  }, [clearTimers, finishMediaRecording, serverTranscriptionSupported]);
 
   const start = useCallback(async () => {
     if (isRecording || !micSupported) return;
+    setTranscriptionError(null);
     const hasMic = await requestMic();
     if (!hasMic) return;
     startedAtRef.current = Date.now();
@@ -264,6 +460,7 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
           recognitionRef.current.abort();
           recognitionRef.current.start();
         } catch {
+          speechSupportedRef.current = false;
           setSpeechSupported(false);
         }
       }
@@ -280,9 +477,22 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   }, [isRecording, micSupported, onAutoStop, requestMic, speechSupported, stop]);
 
   const clearTranscript = useCallback(() => {
+    transcriptionRequestRef.current += 1;
+    lastRecordingRef.current = null;
+    setIsTranscribing(false);
+    setTranscriptionError(null);
     setSegments([]);
     setInterimTranscript("");
   }, []);
+
+  const retryTranscription = useCallback(() => {
+    const recording = lastRecordingRef.current;
+    if (!recording) {
+      setTranscriptionError("No recording is available to retry. Hold the mic and try again.");
+      return;
+    }
+    void transcribeRecording(recording);
+  }, [transcribeRecording]);
 
   useEffect(() => {
     const stopForPageLifecycle = () => stop();
@@ -307,11 +517,14 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   );
 
   return {
-    supported: speechSupported,
+    supported: speechSupported || serverTranscriptionSupported,
     speechSupported,
+    serverTranscriptionSupported,
     micSupported,
     secureContext,
     isRecording,
+    isTranscribing,
+    transcriptionError,
     permissionState,
     segments,
     interimTranscript,
@@ -321,6 +534,7 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     start,
     stop,
     clearTranscript,
+    retryTranscription,
     setSegments
   };
 }

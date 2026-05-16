@@ -41,8 +41,13 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
     [guestId, state]
   );
 
-  const typedMode = !walkie.speechSupported || walkie.permissionState === "denied" || walkie.permissionState === "unsupported";
-  const transcript = typedMode ? typedFallback.trim() || walkie.transcript : walkie.transcript;
+  const serverTranscriptionMode = !walkie.speechSupported && walkie.serverTranscriptionSupported;
+  const typedMode =
+    walkie.permissionState === "denied" ||
+    walkie.permissionState === "unsupported" ||
+    (!walkie.speechSupported && !walkie.serverTranscriptionSupported) ||
+    (!walkie.transcript.trim() && Boolean(walkie.transcriptionError));
+  const transcript = typedFallback.trim() || walkie.transcript;
   const micUnavailable = walkie.permissionState === "unsupported" || !walkie.micSupported;
 
   useEffect(() => {
@@ -63,7 +68,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
     } catch {
       void 0;
     }
-    if (!micUnavailable) {
+    if (!micUnavailable && !walkie.isTranscribing) {
       void walkie.start();
     }
   }
@@ -81,7 +86,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.code === "Space" && !walkie.isRecording && !micUnavailable) {
+    if (event.code === "Space" && !walkie.isRecording && !micUnavailable && !walkie.isTranscribing) {
       event.preventDefault();
       void walkie.start();
     }
@@ -142,12 +147,21 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
   }
 
   const isFull = variant === "full";
-  const statusText = walkie.isRecording ? "Listening..." : transcript ? "Paused" : "Stopped";
+  const statusText = walkie.isTranscribing
+    ? "Transcribing..."
+    : walkie.isRecording
+      ? walkie.speechSupported
+        ? "Listening..."
+        : "Recording from device mic..."
+      : transcript
+        ? "Ready to file"
+        : "Stopped";
 
   return (
     <section
       data-tier="frosted"
       tabIndex={0}
+      aria-busy={walkie.isTranscribing}
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}
       className={cn(
@@ -244,10 +258,25 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
             installed home-screen app on iPhone, or type the note below.
           </div>
         ) : null}
-        {!walkie.speechSupported && !micUnavailable ? (
+        {serverTranscriptionMode && !micUnavailable ? (
           <div className="rounded-lg border bg-secondary/50 p-4 text-sm text-muted-foreground">
-            Live speech-to-text is unavailable here. Hold the mic to capture audio level from the device microphone, then
-            type the note before saving.
+            Live captions are unavailable in this browser. Hold the mic to capture from the device microphone, then
+            release to transcribe the recording automatically.
+          </div>
+        ) : null}
+        {walkie.transcriptionError ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+            <span>{walkie.transcriptionError}</span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={walkie.retryTranscription}
+              disabled={walkie.isTranscribing}
+              className="min-h-10 border-destructive/30 bg-background/70 text-destructive hover:bg-destructive/10"
+            >
+              <RotateCcw className="size-4" />
+              Retry
+            </Button>
           </div>
         ) : null}
 
@@ -260,12 +289,12 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           onPointerCancel={pointerUp}
           onPointerLeave={pointerUp}
           onContextMenu={(event) => event.preventDefault()}
-          disabled={micUnavailable}
+          disabled={micUnavailable || walkie.isTranscribing}
           className={cn(
             "touch-none select-none relative flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_18px_60px_oklch(0.32_0.04_40/0.26)] transition-transform",
             isFull ? "size-[168px]" : "size-24",
             walkie.isRecording && "animate-recording-pulse",
-            micUnavailable && "opacity-50"
+            (micUnavailable || walkie.isTranscribing) && "opacity-50"
           )}
         >
           {walkie.isRecording ? <Mic className={isFull ? "size-14" : "size-9"} /> : <MicOff className={isFull ? "size-14" : "size-9"} />}
@@ -296,23 +325,28 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
                 <p key={segment.id}>{segment.text}</p>
               ))}
               {walkie.interimTranscript ? <p className="italic text-muted-foreground">{walkie.interimTranscript}</p> : null}
-              {!transcript ? <p className="text-muted-foreground">Transcript will appear here.</p> : null}
+              {walkie.isTranscribing ? <p className="italic text-muted-foreground">Transcribing recording...</p> : null}
+              {!transcript && !walkie.isTranscribing ? (
+                <p className="text-muted-foreground">
+                  {serverTranscriptionMode ? "Release the mic to transcribe the recording." : "Transcript will appear here."}
+                </p>
+              ) : null}
             </div>
           ) : (
             <Textarea
               value={typedFallback}
               onChange={(event) => setTypedFallback(event.target.value)}
               aria-label="Type your note"
-              placeholder="Type your note after capturing the voice cue."
+              placeholder="Type the note if transcription fails or microphone access is blocked."
               className="min-h-28"
             />
           )}
         </div>
 
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          <Button onClick={save} className="min-h-10 flex-1">
+          <Button onClick={save} disabled={walkie.isTranscribing} className="min-h-10 flex-1">
             <Save className="size-4" />
-            Save as voice note
+            {walkie.isTranscribing ? "Transcribing..." : "Save as voice note"}
           </Button>
           <Button variant="outline" onClick={discard} className="min-h-10">
             <RotateCcw className="size-4" />
