@@ -8,3 +8,4 @@ dist/
 *.log
 pnpm-debug.log*
 tsconfig.tsbuildinfo
+.vercel
