@@ -15,6 +15,7 @@ export function TodayView() {
   const urgentOpen = state.tickets.filter((ticket) => ticket.priority === "urgent" && ticket.status !== "resolved").length;
   const openTotal = state.tickets.filter((ticket) => ticket.status !== "resolved").length;
   const resolvedToday = state.tickets.filter((ticket) => ticket.status === "resolved").length;
+  const unfiledNotes = state.unfiledNotes.filter((note) => !note.filedAt);
 
   function openGuest(guest: Guest, ticketId?: string) {
     dispatch({ type: "OPEN_GUEST_DETAIL", payload: { guestId: guest.id, ticketId } });
@@ -43,14 +44,14 @@ export function TodayView() {
         </div>
       </div>
 
-      {state.unfiledNotes.length > 0 ? (
+      {unfiledNotes.length > 0 ? (
         <section className="mb-6 rounded-lg border border-accent/40 bg-accent/10 p-4">
           <div className="mb-3 flex items-center gap-2">
             <Inbox className="size-4 text-primary" />
             <h2 className="text-sm font-semibold">Unfiled voice notes</h2>
           </div>
           <div className="grid gap-2">
-            {state.unfiledNotes.map((note) => (
+            {unfiledNotes.map((note) => (
               <div key={note.id} className="flex flex-col gap-3 rounded-md bg-background/70 p-3 text-sm sm:flex-row sm:items-center">
                 <p className="flex-1 text-muted-foreground">{note.transcript}</p>
                 <select

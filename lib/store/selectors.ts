@@ -84,6 +84,18 @@ export function selectTicketById(state: GuestCrmState, ticketId: string) {
   return state.tickets.find((ticket) => ticket.id === ticketId);
 }
 
+export function selectPreferencesByGuest(state: GuestCrmState, guestId: string) {
+  return state.preferences
+    .filter((preference) => preference.guestId === guestId && preference.status !== "dismissed")
+    .toSorted((a, b) => b.confidence - a.confidence || b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export function selectRecommendationsByGuest(state: GuestCrmState, guestId: string) {
+  return state.recommendations
+    .filter((recommendation) => recommendation.guestId === guestId && recommendation.status === "pending")
+    .toSorted((a, b) => b.confidence - a.confidence || b.createdAt.localeCompare(a.createdAt));
+}
+
 export function selectOpenTicketCountByGuest(state: GuestCrmState, guestId: string) {
   return state.tickets.filter((ticket) => ticket.guestId === guestId && isActiveTicket(ticket)).length;
 }

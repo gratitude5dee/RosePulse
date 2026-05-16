@@ -1,0 +1,28 @@
+project_id = "rosepulse"
+
+[api]
+enabled = true
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://localhost:3000/**", "https://rosepulse.vercel.app/**"]
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+file_size_limit = "25MiB"
+
+[functions.classify-transcript]
+verify_jwt = true
+
+[functions.extract-preferences]
+verify_jwt = true
+
+[functions.recommend-next-actions]
+verify_jwt = true

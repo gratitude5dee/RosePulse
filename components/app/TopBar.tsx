@@ -3,6 +3,7 @@
 import { Bell, Menu, PanelRightClose, PanelRightOpen, Search, UserRound } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { KbdHint } from "@/components/app/KbdHint";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
+import { useGuestCrm } from "@/lib/store/store-context";
 
 export function TopBar({
   onMenu,
@@ -25,6 +27,9 @@ export function TopBar({
   onToggleRail: () => void;
   railCollapsed: boolean;
 }) {
+  const { state } = useGuestCrm();
+  const syncLabel = state.backend.mode === "supabase" ? (state.backend.status === "synced" ? "Live" : "Syncing") : "Fixture";
+
   return (
     <header className="sticky top-0 z-30 flex min-h-[calc(4rem+var(--safe-top))] items-center gap-2 border-b bg-background/78 px-safe pt-safe backdrop-blur-xl sm:gap-3">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenu} aria-label="Open navigation">
@@ -37,6 +42,13 @@ export function TopBar({
       <div className="hidden rounded-full border bg-secondary/60 px-3 py-1 text-xs text-muted-foreground sm:block">
         {format(new Date(), "EEEE, MMM d")}
       </div>
+      <Badge
+        variant={state.backend.status === "error" ? "destructive" : state.backend.mode === "supabase" ? "champagne" : "secondary"}
+        className="hidden shrink-0 sm:inline-flex"
+        title={state.backend.message}
+      >
+        {syncLabel}
+      </Badge>
       <button
         type="button"
         onClick={onSearch}

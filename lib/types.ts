@@ -96,6 +96,10 @@ export interface UnfiledVoiceNote {
   category: TicketCategory;
   priority: TicketPriority;
   createdAt: string;
+  guestId?: string;
+  ticketId?: string;
+  filedAt?: string;
+  filedBy?: string;
 }
 
 export interface NewTicketDraft {
@@ -103,16 +107,66 @@ export interface NewTicketDraft {
   category?: TicketCategory;
 }
 
+export type BackendMode = "fixtures" | "supabase";
+export type BackendSyncStatus = "idle" | "hydrating" | "syncing" | "synced" | "error";
+
+export interface BackendSyncState {
+  mode: BackendMode;
+  status: BackendSyncStatus;
+  message?: string;
+  lastSyncedAt?: string;
+  pendingActions: number;
+}
+
+export type PreferenceCategory =
+  | "dining"
+  | "room"
+  | "wellness"
+  | "service"
+  | "accessibility"
+  | "security"
+  | "occasion";
+
+export type PreferenceStatus = "candidate" | "confirmed" | "dismissed";
+export type PreferenceSourceType = "tag" | "note" | "ticket" | "voice_note" | "staff";
+
+export interface GuestPreference {
+  id: string;
+  guestId: string;
+  category: PreferenceCategory;
+  label: string;
+  detail: string;
+  confidence: number;
+  status: PreferenceStatus;
+  sourceType: PreferenceSourceType;
+  evidenceIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PreferenceRecommendation {
+  id: string;
+  guestId: string;
+  title: string;
+  rationale: string;
+  confidence: number;
+  status: "pending" | "accepted" | "dismissed";
+  createdAt: string;
+}
+
 export interface GuestCrmState {
   guests: Guest[];
   tickets: Ticket[];
   staff: Staff[];
+  preferences: GuestPreference[];
+  recommendations: PreferenceRecommendation[];
   focusedGuestId?: string;
   detailGuestId?: string;
   focusedTicketId?: string;
   newTicketOpen: boolean;
   newTicketDraft?: NewTicketDraft;
   unfiledNotes: UnfiledVoiceNote[];
+  backend: BackendSyncState;
 }
 
 /** Raw intake channel for GuestPulse extraction (text only in MVP). */

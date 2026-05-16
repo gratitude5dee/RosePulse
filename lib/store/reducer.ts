@@ -39,6 +39,7 @@ export type GuestCrmAction =
   | { type: "CLOSE_NEW_TICKET" }
   | { type: "ADD_UNFILED_NOTE"; payload: Omit<UnfiledVoiceNote, "id" | "createdAt"> }
   | { type: "FILE_UNFILED_NOTE"; payload: { noteId: string; guestId: string; priority?: TicketPriority } }
+  | { type: "SET_BACKEND_SYNC"; payload: Partial<GuestCrmState["backend"]> }
   | { type: "REPLACE_STORE"; payload: GuestCrmState };
 
 const CURRENT_STAFF = {
@@ -237,9 +238,26 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
       return {
         ...state,
         tickets: [ticket, ...state.tickets],
-        unfiledNotes: state.unfiledNotes.filter((item) => item.id !== note.id)
+        unfiledNotes: state.unfiledNotes.map((item) =>
+          item.id === note.id
+            ? {
+                ...item,
+                guestId: action.payload.guestId,
+                filedAt: nowIso(),
+                filedBy: CURRENT_STAFF.id
+              }
+            : item
+        )
       };
     }
+    case "SET_BACKEND_SYNC":
+      return {
+        ...state,
+        backend: {
+          ...state.backend,
+          ...action.payload
+        }
+      };
     case "REPLACE_STORE":
       return action.payload;
     default:

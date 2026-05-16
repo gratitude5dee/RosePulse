@@ -1,11 +1,11 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GuestAvatar } from "@/components/app/GuestAvatar";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PreferencePanel } from "@/components/app/PreferencePanel";
 import { TicketAccordion } from "@/components/app/TicketAccordion";
 import { TicketRow } from "@/components/app/TicketRow";
 import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/categories";
@@ -145,11 +145,7 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
         </TabsContent>
 
         <TabsContent value="preferences">
-          <EmptyState
-            title="Preference intelligence coming soon."
-            body="Phase 2 will replace this placeholder with recommendation signals. Phase 1 intentionally leaves it empty."
-            icon={Sparkles}
-          />
+          <PreferencePanel guestId={guest.id} />
         </TabsContent>
 
         <TabsContent value="activity">

@@ -1,0 +1,62 @@
+begin;
+
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
+
+select plan(6);
+
+insert into public.properties (id, name, slug)
+values
+  ('test_property_a', 'Test Property A', 'test-property-a'),
+  ('test_property_b', 'Test Property B', 'test-property-b')
+on conflict (id) do nothing;
+
+insert into public.staff_profiles (id, auth_user_id, name, role, on_shift)
+values
+  ('test_staff_a', '11111111-1111-4111-8111-111111111111', 'RLS Member', 'concierge', true),
+  ('test_manager_a', '22222222-2222-4222-8222-222222222222', 'RLS Manager', 'manager', true),
+  ('test_staff_b', '33333333-3333-4333-8333-333333333333', 'RLS Other', 'concierge', true)
+on conflict (id) do nothing;
+
+insert into public.staff_property_memberships (id, staff_id, auth_user_id, property_id, role, active)
+values
+  ('test_member_a', 'test_staff_a', '11111111-1111-4111-8111-111111111111', 'test_property_a', 'concierge', true),
+  ('test_manager_member_a', 'test_manager_a', '22222222-2222-4222-8222-222222222222', 'test_property_a', 'manager', true),
+  ('test_member_b', 'test_staff_b', '33333333-3333-4333-8333-333333333333', 'test_property_b', 'concierge', true)
+on conflict (id) do nothing;
+
+insert into public.guests (id, property_id, first_name, last_name)
+values
+  ('test_guest_a', 'test_property_a', 'Ada', 'A'),
+  ('test_guest_b', 'test_property_b', 'Bea', 'B')
+on conflict (id) do nothing;
+
+set local role anon;
+select is((select count(*) from public.guests), 0::bigint, 'anon cannot read guests');
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+select is((select count(*) from public.guests where property_id = 'test_property_a'), 1::bigint, 'property member can read own property guests');
+select is((select count(*) from public.guests where property_id = 'test_property_b'), 0::bigint, 'property member cannot read cross-property guests');
+
+insert into public.tickets (id, property_id, guest_id, category, title, detail, priority, status, created_by)
+values ('test_ticket_a', 'test_property_a', 'test_guest_a', 'guest_relations', 'Confirm greeting', 'RLS insert test.', 'medium', 'open', 'test_staff_a');
+select ok(exists(select 1 from public.tickets where id = 'test_ticket_a'), 'property member can insert tickets');
+
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+insert into public.guest_preferences (id, property_id, guest_id, category, label, detail, confidence, status, source_type)
+values ('test_pref_a', 'test_property_a', 'test_guest_a', 'service', 'Quiet greeting', 'Use a low-friction arrival touchpoint.', 0.7, 'candidate', 'staff');
+update public.guest_preferences
+set status = 'confirmed'
+where id = 'test_pref_a';
+select is((select status::text from public.guest_preferences where id = 'test_pref_a'), 'candidate', 'non-manager cannot resolve preferences');
+
+select set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', true);
+insert into public.staff_property_memberships (id, staff_id, auth_user_id, property_id, role, active)
+values ('test_manager_created_member', 'test_staff_a', '11111111-1111-4111-8111-111111111111', 'test_property_a', 'concierge', true)
+on conflict (id) do update set active = excluded.active;
+select ok(exists(select 1 from public.staff_property_memberships where id = 'test_manager_created_member'), 'manager can manage memberships');
+
+select * from finish();
+
+rollback;
