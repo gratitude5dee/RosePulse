@@ -1,0 +1,116 @@
+export type StaffRole =
+  | "concierge"
+  | "front_desk"
+  | "housekeeping_lead"
+  | "fnb_captain"
+  | "spa_supervisor"
+  | "security_lead"
+  | "manager";
+
+export type GuestStatus =
+  | "arriving_today"
+  | "checked_in"
+  | "in_house"
+  | "departing_today"
+  | "upcoming"
+  | "checked_out";
+
+export type LoyaltyTier = "Standard" | "Silver" | "Gold" | "Platinum" | "Founder";
+
+export interface Guest {
+  id: string;
+  firstName: string;
+  lastName: string;
+  preferredName?: string;
+  pronouns?: string;
+  avatarUrl?: string;
+  loyaltyTier: LoyaltyTier;
+  vip: boolean;
+  arrivalDate: string;
+  departureDate: string;
+  status: GuestStatus;
+  roomNumber?: string;
+  roomType: string;
+  partySize: number;
+  occasion?: "anniversary" | "birthday" | "honeymoon" | "business" | "leisure";
+  languages: string[];
+  homeCity?: string;
+  tags: string[];
+  notes?: string;
+}
+
+export type TicketCategory = "guest_relations" | "room" | "housekeeping" | "security" | "fnb" | "spa";
+
+export type TicketPriority = "low" | "medium" | "high" | "urgent";
+
+export type TicketStatus = "open" | "in_progress" | "blocked" | "resolved" | "escalated";
+
+export interface TicketEvent {
+  id: string;
+  ticketId: string;
+  type: "created" | "status_changed" | "escalated" | "comment" | "voice_note" | "assigned";
+  actorId: string;
+  actorName: string;
+  at: string;
+  body?: string;
+  audioUrl?: string;
+  fromStatus?: TicketStatus;
+  toStatus?: TicketStatus;
+  escalatedTo?: StaffRole;
+}
+
+export interface Ticket {
+  id: string;
+  guestId: string;
+  category: TicketCategory;
+  title: string;
+  detail: string;
+  priority: TicketPriority;
+  status: TicketStatus;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  assignedTo?: StaffRole;
+  dueAt?: string;
+  events: TicketEvent[];
+}
+
+export interface Staff {
+  id: string;
+  name: string;
+  role: StaffRole;
+  avatarUrl?: string;
+  onShift: boolean;
+}
+
+export interface TranscriptSegment {
+  id: string;
+  text: string;
+  at: string;
+  isFinal: boolean;
+}
+
+export interface UnfiledVoiceNote {
+  id: string;
+  transcript: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  createdAt: string;
+}
+
+export interface NewTicketDraft {
+  guestId?: string;
+  category?: TicketCategory;
+}
+
+export interface GuestCrmState {
+  guests: Guest[];
+  tickets: Ticket[];
+  staff: Staff[];
+  focusedGuestId?: string;
+  detailGuestId?: string;
+  focusedTicketId?: string;
+  newTicketOpen: boolean;
+  newTicketDraft?: NewTicketDraft;
+  unfiledNotes: UnfiledVoiceNote[];
+}
