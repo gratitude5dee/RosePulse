@@ -29,7 +29,7 @@ export function TodayView() {
   }
 
   return (
-    <div className="px-4 py-6 md:px-8">
+    <div className="px-safe py-6 md:px-8">
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="display-1">Today</h1>
@@ -54,7 +54,7 @@ export function TodayView() {
               <div key={note.id} className="flex flex-col gap-3 rounded-md bg-background/70 p-3 text-sm sm:flex-row sm:items-center">
                 <p className="flex-1 text-muted-foreground">{note.transcript}</p>
                 <select
-                  className="h-9 rounded-md border bg-background px-2 text-sm"
+                  className="h-10 rounded-md border bg-background px-2 text-sm"
                   defaultValue=""
                   onChange={(event) => {
                     if (event.target.value) {

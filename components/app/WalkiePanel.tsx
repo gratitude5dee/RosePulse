@@ -41,7 +41,9 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
     [guestId, state]
   );
 
-  const transcript = walkie.supported ? walkie.transcript : typedFallback;
+  const typedMode = !walkie.speechSupported || walkie.permissionState === "denied" || walkie.permissionState === "unsupported";
+  const transcript = typedMode ? typedFallback.trim() || walkie.transcript : walkie.transcript;
+  const micUnavailable = walkie.permissionState === "unsupported" || !walkie.micSupported;
 
   useEffect(() => {
     if (!categoryTouched && transcript.trim()) {
@@ -54,20 +56,32 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
     setCategory(value);
   }
 
-  function pointerDown() {
-    if (walkie.supported) {
+  function pointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      void 0;
+    }
+    if (!micUnavailable) {
       void walkie.start();
     }
   }
 
-  function pointerUp() {
-    if (walkie.supported) {
+  function pointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      void 0;
+    }
+    if (!micUnavailable) {
       walkie.stop();
     }
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.code === "Space" && !walkie.isRecording && walkie.supported) {
+    if (event.code === "Space" && !walkie.isRecording && !micUnavailable) {
       event.preventDefault();
       void walkie.start();
     }
@@ -77,7 +91,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
   }
 
   function handleKeyUp(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.code === "Space" && walkie.isRecording && walkie.supported) {
+    if (event.code === "Space" && walkie.isRecording && !micUnavailable) {
       event.preventDefault();
       walkie.stop();
     }
@@ -137,8 +151,8 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}
       className={cn(
-        "flex h-full flex-col rounded-lg p-4 outline-none",
-        isFull ? "min-h-[calc(100dvh-7rem)]" : "min-h-[calc(100dvh-6rem)]"
+        "flex h-full flex-col overflow-hidden rounded-lg p-4 outline-none",
+        isFull ? "min-h-[calc(100dvh-8rem)] pb-[max(var(--safe-bottom),1rem)]" : "min-h-[calc(100dvh-6rem)]"
       )}
     >
       <header className="flex items-start justify-between gap-3 border-b pb-4">
@@ -152,7 +166,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
         <span className="rounded-full bg-secondary px-2 py-1 font-mono text-xs">{formatElapsed(walkie.elapsedSeconds)}</span>
       </header>
 
-      <div className={cn("grid gap-3 py-4", isFull ? "md:grid-cols-4" : "grid-cols-1")}>
+      <div className={cn("grid gap-3 py-4", isFull ? "sm:grid-cols-2 md:grid-cols-4" : "grid-cols-1")}>
         <div className="grid gap-1.5">
           <Label>Guest</Label>
           <Select value={guestId} onValueChange={(value) => setGuestId(value)}>
@@ -220,7 +234,20 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
       <div className="flex flex-1 flex-col items-center justify-center gap-4 py-4">
         {walkie.permissionState === "denied" ? (
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
-            Microphone access is blocked. Allow microphone access in the browser, then try again.
+            Microphone access is blocked. On iPhone, open the HTTPS preview in Safari or the installed home-screen app,
+            then allow microphone access for this site and try again.
+          </div>
+        ) : null}
+        {micUnavailable ? (
+          <div className="rounded-lg border bg-secondary/50 p-4 text-sm text-muted-foreground">
+            Microphone capture requires a secure HTTPS context and browser media support. Use Safari over HTTPS or the
+            installed home-screen app on iPhone, or type the note below.
+          </div>
+        ) : null}
+        {!walkie.speechSupported && !micUnavailable ? (
+          <div className="rounded-lg border bg-secondary/50 p-4 text-sm text-muted-foreground">
+            Live speech-to-text is unavailable here. Hold the mic to capture audio level from the device microphone, then
+            type the note before saving.
           </div>
         ) : null}
 
@@ -232,12 +259,13 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           onPointerUp={pointerUp}
           onPointerCancel={pointerUp}
           onPointerLeave={pointerUp}
-          disabled={!walkie.supported}
+          onContextMenu={(event) => event.preventDefault()}
+          disabled={micUnavailable}
           className={cn(
-            "relative flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_18px_60px_oklch(0.32_0.04_40/0.26)] transition-transform",
+            "touch-none select-none relative flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_18px_60px_oklch(0.32_0.04_40/0.26)] transition-transform",
             isFull ? "size-[168px]" : "size-24",
             walkie.isRecording && "animate-recording-pulse",
-            !walkie.supported && "opacity-50"
+            micUnavailable && "opacity-50"
           )}
         >
           {walkie.isRecording ? <Mic className={isFull ? "size-14" : "size-9"} /> : <MicOff className={isFull ? "size-14" : "size-9"} />}
@@ -250,7 +278,8 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           <p aria-live="polite" className="font-medium">
             {statusText}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Space works while this panel is focused.</p>
+          <p className="mt-1 hidden text-xs text-muted-foreground md:block">Space works while this panel is focused.</p>
+          <p className="mt-1 text-xs text-muted-foreground md:hidden">Touch and hold the mic.</p>
         </div>
         <Waveform level={walkie.audioLevel} className={isFull ? "w-full max-w-lg" : "w-full"} />
       </div>
@@ -261,7 +290,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
             <span>Live transcript</span>
             <span>{new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
           </div>
-          {walkie.supported ? (
+          {!typedMode ? (
             <div aria-live="polite" className="min-h-24 space-y-2 font-mono text-sm">
               {walkie.segments.map((segment) => (
                 <p key={segment.id}>{segment.text}</p>
@@ -273,22 +302,23 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
             <Textarea
               value={typedFallback}
               onChange={(event) => setTypedFallback(event.target.value)}
-              aria-label="Voice unavailable in this browser - type your note"
-              placeholder="Voice unavailable in this browser - type your note"
+              aria-label="Type your note"
+              placeholder="Type your note after capturing the voice cue."
+              className="min-h-28"
             />
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={save} className="flex-1">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+          <Button onClick={save} className="min-h-10 flex-1">
             <Save className="size-4" />
             Save as voice note
           </Button>
-          <Button variant="outline" onClick={discard}>
+          <Button variant="outline" onClick={discard} className="min-h-10">
             <RotateCcw className="size-4" />
             Discard
           </Button>
-          <Button variant="ghost" onClick={() => void copyTranscript()}>
+          <Button variant="ghost" onClick={() => void copyTranscript()} className="min-h-10">
             <Clipboard className="size-4" />
             Copy
           </Button>
@@ -296,6 +326,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
             <Button
               variant="ghost"
               onClick={() => dispatch({ type: "OPEN_NEW_TICKET", payload: { guestId, category } })}
+              className="min-h-10"
             >
               <Send className="size-4" />
               Ticket

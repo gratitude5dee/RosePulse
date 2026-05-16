@@ -66,14 +66,14 @@ export function GuestCard({
   return (
     <article
       data-tier="editorial"
-      className={cn("flex min-h-[360px] flex-col rounded-lg p-5", className)}
+      className={cn("flex min-h-[340px] flex-col rounded-lg p-4 sm:min-h-[360px] sm:p-5", className)}
       onPointerDown={startLongPress}
       onPointerUp={clearLongPress}
       onPointerLeave={clearLongPress}
       onPointerCancel={clearLongPress}
     >
       <div className="flex items-start gap-3">
-        <GuestAvatar guest={guest} className="size-12" />
+        <GuestAvatar guest={guest} className="size-11 sm:size-12" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -92,7 +92,7 @@ export function GuestCard({
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2 min-[440px]:grid-cols-3">
+      <div className="mt-5 grid grid-cols-2 gap-1.5 min-[440px]:grid-cols-3 sm:gap-2">
         {CATEGORY_ORDER.map((category) => (
           <CategoryChip
             key={category}
@@ -121,15 +121,15 @@ export function GuestCard({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
-        <Button variant="secondary" size="sm" onClick={() => onTalk(guest)}>
+        <Button variant="secondary" size="sm" className="min-h-10" onClick={() => onTalk(guest)}>
           <MessageCircle className="size-4" />
           Talk to file
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => onAddTicket(guest)}>
+        <Button variant="ghost" size="sm" className="min-h-10" onClick={() => onAddTicket(guest)}>
           <Plus className="size-4" />
           Add ticket
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => onOpen(guest)}>
+        <Button variant="ghost" size="sm" className="min-h-10" onClick={() => onOpen(guest)}>
           <UserRound className="size-4" />
           Open profile
         </Button>

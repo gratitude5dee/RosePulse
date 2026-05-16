@@ -35,6 +35,10 @@
 }
 
 :root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --background: oklch(0.985 0.008 85);
   --foreground: oklch(0.18 0.015 60);
   --card: oklch(1 0 0 / 0.72);
@@ -117,16 +121,50 @@
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
+@utility pt-safe {
+  padding-top: var(--safe-top);
+}
+
+@utility pb-safe {
+  padding-bottom: var(--safe-bottom);
+}
+
+@utility pl-safe {
+  padding-left: var(--safe-left);
+}
+
+@utility pr-safe {
+  padding-right: var(--safe-right);
+}
+
+@utility px-safe {
+  padding-left: max(1rem, var(--safe-left));
+  padding-right: max(1rem, var(--safe-right));
+}
+
+@utility bottom-safe {
+  bottom: max(1rem, var(--safe-bottom));
+}
+
+@utility min-h-screen-safe {
+  min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+}
+
 * {
   border-color: var(--border);
+  min-width: 0;
 }
 
 html {
+  min-height: 100%;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
   background:
     radial-gradient(circle at 12% -10%, oklch(0.95 0.04 75 / 0.42), transparent 34rem),
     radial-gradient(circle at 88% 0%, oklch(0.92 0.035 40 / 0.26), transparent 28rem),
@@ -134,6 +172,13 @@ body {
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports not (overflow: clip) {
+  body {
+    overflow-x: hidden;
+  }
 }
 
 body::before {
@@ -244,5 +289,11 @@ body::before {
   .animate-recording-pulse,
   .animate-ring-spin {
     animation: none !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .guest-card-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

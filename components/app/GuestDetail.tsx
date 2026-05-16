@@ -42,7 +42,7 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
   }
 
   return (
-    <div className={cn("mx-auto w-full max-w-5xl", mode === "drawer" ? "pb-8" : "px-4 py-6 md:px-8")}>
+    <div className={cn("mx-auto w-full max-w-5xl", mode === "drawer" ? "pb-8" : "px-safe py-6 md:px-8")}>
       <section className="rounded-lg border bg-background/72 p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <GuestAvatar guest={guest} className="size-16" />
@@ -63,11 +63,11 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
               {guest.roomNumber ? `Room ${guest.roomNumber}` : "Room pending"} · {guest.roomType}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => dispatch({ type: "SET_FOCUSED_GUEST", payload: { guestId: guest.id } })}>
+          <div className="flex flex-wrap gap-2">
+            <Button className="min-h-10" variant="secondary" onClick={() => dispatch({ type: "SET_FOCUSED_GUEST", payload: { guestId: guest.id } })}>
               Talk to file
             </Button>
-            <Button onClick={() => dispatch({ type: "OPEN_NEW_TICKET", payload: { guestId: guest.id } })}>New ticket</Button>
+            <Button className="min-h-10" onClick={() => dispatch({ type: "OPEN_NEW_TICKET", payload: { guestId: guest.id } })}>New ticket</Button>
           </div>
         </div>
       </section>

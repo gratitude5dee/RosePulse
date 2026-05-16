@@ -9,7 +9,7 @@ const WalkiePanel = dynamic(() => import("@/components/app/WalkiePanel").then((m
 
 export function RadioView() {
   return (
-    <div className="px-4 py-6 md:px-8">
+    <div className="px-safe py-6 pb-[max(var(--safe-bottom),1.5rem)] md:px-8">
       <div className="mb-5">
         <h1 className="display-1">Radio</h1>
         <p className="text-sm text-muted-foreground">Full-screen push-to-talk filing.</p>

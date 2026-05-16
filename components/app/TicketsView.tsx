@@ -47,7 +47,7 @@ export function TicketsView() {
   }
 
   return (
-    <div className="px-4 py-6 md:px-8">
+    <div className="px-safe py-6 md:px-8">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="display-1">Tickets</h1>
@@ -66,12 +66,12 @@ export function TicketsView() {
       </div>
 
       <div className="mb-5 grid gap-3 rounded-lg border bg-background/62 p-3 lg:grid-cols-[1fr_180px_180px_220px]">
-        <div className="flex gap-2 overflow-x-auto">
-          <Button size="sm" variant={category === "all" ? "default" : "outline"} onClick={() => setCategory("all")}>
+        <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+          <Button className="shrink-0" size="sm" variant={category === "all" ? "default" : "outline"} onClick={() => setCategory("all")}>
             All
           </Button>
           {CATEGORY_ORDER.map((item) => (
-            <Button key={item} size="sm" variant={category === item ? "default" : "outline"} onClick={() => setCategory(item)}>
+            <Button key={item} className="shrink-0" size="sm" variant={category === item ? "default" : "outline"} onClick={() => setCategory(item)}>
               {CATEGORY_META[item].label}
             </Button>
           ))}
@@ -128,9 +128,9 @@ export function TicketsView() {
                   {groupTickets.map((ticket) => {
                     const guest = selectGuestById(state, ticket.guestId);
                     return (
-                      <div key={ticket.id} className="grid gap-3 rounded-md border bg-background/60 p-2 lg:grid-cols-[220px_minmax(0,1fr)]">
+                      <div key={ticket.id} className="grid min-w-0 gap-3 rounded-md border bg-background/60 p-2 lg:grid-cols-[220px_minmax(0,1fr)]">
                         {guest ? (
-                          <div className="flex items-center gap-3 px-2">
+                          <div className="flex min-w-0 items-center gap-3 px-2">
                             <GuestAvatar guest={guest} className="size-9" />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium">{guestDisplayName(guest)}</p>
@@ -165,7 +165,7 @@ export function TicketsView() {
                         type="button"
                         key={ticket.id}
                         onClick={() => openTicket(ticket)}
-                        className="w-full rounded-md border bg-secondary/30 p-3 text-left text-sm hover:bg-secondary/60"
+                        className="min-h-11 w-full rounded-md border bg-secondary/30 p-3 text-left text-sm hover:bg-secondary/60"
                       >
                         <p className="font-medium">{ticket.title}</p>
                         <p className="mt-1 text-xs text-muted-foreground">

@@ -50,6 +50,9 @@ interface BrowserSpeechRecognitionErrorEvent extends Event {
 interface SpeechWindow extends Window {
   SpeechRecognition?: BrowserSpeechRecognitionConstructor;
   webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  webkitAudioContext?: {
+    new (contextOptions?: AudioContextOptions): AudioContext;
+  };
 }
 
 interface UseWalkieOptions {
@@ -60,7 +63,9 @@ interface UseWalkieOptions {
 export type WalkiePermissionState = "unknown" | "granted" | "denied" | "unsupported";
 
 export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
-  const [supported, setSupported] = useState(true);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const [micSupported, setMicSupported] = useState(true);
+  const [secureContext, setSecureContext] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [permissionState, setPermissionState] = useState<WalkiePermissionState>("unknown");
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -75,13 +80,20 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   const startedAtRef = useRef<number | null>(null);
   const autoStopRef = useRef<number | null>(null);
   const elapsedRef = useRef<number | null>(null);
+  const lastSampleAtRef = useRef(0);
 
   useEffect(() => {
+    const canUseMic = Boolean(navigator.mediaDevices?.getUserMedia) && window.isSecureContext;
+    setSecureContext(window.isSecureContext);
+    setMicSupported(canUseMic);
+    if (!canUseMic) {
+      setPermissionState("unsupported");
+    }
+
     const win = window as SpeechWindow;
     const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
     if (!Recognition) {
-      setSupported(false);
-      setPermissionState("unsupported");
+      setSpeechSupported(false);
       return;
     }
 
@@ -114,14 +126,14 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     };
     recognition.onerror = (event) => {
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        setPermissionState("denied");
+        setSpeechSupported(false);
       }
-      setIsRecording(false);
-    };
-    recognition.onend = () => {
-      setIsRecording(false);
       setInterimTranscript("");
     };
+    recognition.onend = () => {
+      setInterimTranscript("");
+    };
+    setSpeechSupported(true);
     recognitionRef.current = recognition;
 
     return () => {
@@ -137,53 +149,94 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     }
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
-    void audioContextRef.current?.close();
+    const audioContext = audioContextRef.current;
+    if (audioContext && audioContext.state !== "closed") {
+      void audioContext.close().catch(() => undefined);
+    }
     audioContextRef.current = null;
     analyserRef.current = null;
+    lastSampleAtRef.current = 0;
     setAudioLevel(0);
   }, []);
 
-  const sampleAudio = useCallback(() => {
+  const sampleAudio = useCallback((time?: number) => {
     const analyser = analyserRef.current;
     if (!analyser) return;
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteTimeDomainData(data);
-    let sum = 0;
-    for (const value of data) {
-      const centered = (value - 128) / 128;
-      sum += centered * centered;
+    if (time === undefined || time - lastSampleAtRef.current >= 50) {
+      lastSampleAtRef.current = time ?? performance.now();
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (const value of data) {
+        const centered = (value - 128) / 128;
+        sum += centered * centered;
+      }
+      const rms = Math.sqrt(sum / data.length);
+      setAudioLevel(Math.min(1, rms * 4));
     }
-    const rms = Math.sqrt(sum / data.length);
-    setAudioLevel(Math.min(1, rms * 4));
     frameRef.current = requestAnimationFrame(sampleAudio);
   }, []);
 
   const requestMic = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       setPermissionState("unsupported");
+      setMicSupported(false);
       return false;
     }
+
+    const win = window as SpeechWindow;
+    const AudioContextConstructor = window.AudioContext ?? win.webkitAudioContext;
+    if (!AudioContextConstructor) {
+      setPermissionState("unsupported");
+      setMicSupported(false);
+      return false;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stopAudio();
+
+      const preferredAudio: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      };
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: preferredAudio });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
       streamRef.current = stream;
-      const AudioContextConstructor = window.AudioContext;
       const audioContext = new AudioContextConstructor();
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 64;
       audioContext.createMediaStreamSource(stream).connect(analyser);
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
       setPermissionState("granted");
+      setMicSupported(true);
+      lastSampleAtRef.current = 0;
       frameRef.current = requestAnimationFrame(sampleAudio);
       return true;
-    } catch {
-      setPermissionState("denied");
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : "";
+      setPermissionState(name === "NotAllowedError" || name === "SecurityError" ? "denied" : "unsupported");
+      setMicSupported(name !== "NotAllowedError" && name !== "SecurityError" ? false : true);
+      stopAudio();
       return false;
     }
-  }, [sampleAudio]);
+  }, [sampleAudio, stopAudio]);
 
   const stop = useCallback(() => {
-    recognitionRef.current?.stop();
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      recognitionRef.current?.abort();
+    }
     setIsRecording(false);
     stopAudio();
     if (autoStopRef.current !== null) {
@@ -197,17 +250,23 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   }, [stopAudio]);
 
   const start = useCallback(async () => {
-    if (!supported || !recognitionRef.current) return;
+    if (isRecording || !micSupported) return;
     const hasMic = await requestMic();
     if (!hasMic) return;
     startedAtRef.current = Date.now();
     setElapsedSeconds(0);
     setIsRecording(true);
-    try {
-      recognitionRef.current.start();
-    } catch {
-      recognitionRef.current.stop();
-      recognitionRef.current.start();
+    if (speechSupported && recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch {
+        try {
+          recognitionRef.current.abort();
+          recognitionRef.current.start();
+        } catch {
+          setSpeechSupported(false);
+        }
+      }
     }
     elapsedRef.current = window.setInterval(() => {
       if (startedAtRef.current) {
@@ -218,14 +277,29 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
       stop();
       onAutoStop?.();
     }, 60_000);
-  }, [onAutoStop, requestMic, stop, supported]);
+  }, [isRecording, micSupported, onAutoStop, requestMic, speechSupported, stop]);
 
   const clearTranscript = useCallback(() => {
     setSegments([]);
     setInterimTranscript("");
   }, []);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    const stopForPageLifecycle = () => stop();
+    const stopWhenHidden = () => {
+      if (document.visibilityState !== "visible") {
+        stop();
+      }
+    };
+
+    document.addEventListener("visibilitychange", stopWhenHidden);
+    window.addEventListener("pagehide", stopForPageLifecycle);
+    return () => {
+      document.removeEventListener("visibilitychange", stopWhenHidden);
+      window.removeEventListener("pagehide", stopForPageLifecycle);
+      stop();
+    };
+  }, [stop]);
 
   const transcript = useMemo(
     () => [...segments.map((segment) => segment.text), interimTranscript].filter(Boolean).join(" "),
@@ -233,7 +307,10 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   );
 
   return {
-    supported,
+    supported: speechSupported,
+    speechSupported,
+    micSupported,
+    secureContext,
     isRecording,
     permissionState,
     segments,

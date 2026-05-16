@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         railCollapsed ? "lg:grid-cols-[260px_minmax(0,1fr)_64px]" : "lg:grid-cols-[260px_minmax(0,1fr)_380px]"
       )}
     >
-      <div className="sticky top-0 hidden h-dvh border-r bg-background/64 backdrop-blur-xl md:block">
+      <div className="sticky top-0 hidden h-dvh border-r bg-background/64 pt-safe backdrop-blur-xl md:block">
         <Sidebar />
       </div>
 
@@ -69,10 +69,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           railCollapsed={railCollapsed}
           onToggleRail={() => setRailCollapsed((current) => !current)}
         />
-        <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-24 lg:pb-6">{children}</main>
+        <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-28 lg:pb-6">{children}</main>
       </div>
 
-      <aside className="sticky top-0 hidden h-dvh border-l bg-background/40 p-3 backdrop-blur-xl lg:block">
+      <aside className="sticky top-0 hidden h-dvh border-l bg-background/40 p-3 pt-[max(var(--safe-top),0.75rem)] backdrop-blur-xl lg:block">
         {railCollapsed ? (
           <div className="flex h-full flex-col items-center gap-3 pt-16">
             <Button variant="accent" size="icon" onClick={() => setRailCollapsed(false)} aria-label="Expand walkie rail">
@@ -88,14 +88,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <button
         type="button"
         onClick={() => setMobileWalkieOpen(true)}
-        className="fixed bottom-4 left-1/2 z-40 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xl lg:hidden"
+        aria-label="Open walkie talkie"
+        className="fixed bottom-safe left-1/2 z-40 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xl lg:hidden"
       >
         <Radio className="size-4" />
-        Hold to talk
+        Walkie
       </button>
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <SheetContent side="left" className="w-[300px] p-0">
+        <SheetContent side="left" className="w-[min(300px,88vw)] p-0 pb-safe pt-safe">
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
             <SheetDescription>Rosewood CRM navigation</SheetDescription>
@@ -105,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <Sheet open={mobileWalkieOpen} onOpenChange={setMobileWalkieOpen}>
-        <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto p-3">
+        <SheetContent side="bottom" className="max-h-[calc(100dvh-var(--safe-top))] overflow-y-auto p-3 pb-[max(var(--safe-bottom),0.75rem)]">
           <SheetHeader className="sr-only">
             <SheetTitle>Walkie-Talkie</SheetTitle>
             <SheetDescription>Push-to-talk guest filing panel</SheetDescription>
@@ -115,7 +116,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <Sheet open={Boolean(state.detailGuestId)} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_GUEST_DETAIL" })}>
-        <SheetContent side="right" className="w-full overflow-y-auto p-4 sm:max-w-[640px]">
+        <SheetContent side="right" className="w-full overflow-y-auto p-4 pb-[max(var(--safe-bottom),1rem)] pt-[max(var(--safe-top),1rem)] sm:max-w-[640px]">
           <SheetHeader className="sr-only">
             <SheetTitle>Guest detail</SheetTitle>
             <SheetDescription>Guest profile, tickets, preferences, and activity.</SheetDescription>

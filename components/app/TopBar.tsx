@@ -26,13 +26,13 @@ export function TopBar({
   railCollapsed: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/78 px-4 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 flex min-h-[calc(4rem+var(--safe-top))] items-center gap-2 border-b bg-background/78 px-safe pt-safe backdrop-blur-xl sm:gap-3">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenu} aria-label="Open navigation">
         <Menu className="size-5" />
       </Button>
-      <div className="min-w-0">
+      <div className="min-w-0 max-w-[9rem] sm:max-w-none">
         <p className="truncate text-sm font-semibold">Rosewood Manor</p>
-        <p className="text-xs text-muted-foreground">Frontline operations</p>
+        <p className="hidden text-xs text-muted-foreground sm:block">Frontline operations</p>
       </div>
       <div className="hidden rounded-full border bg-secondary/60 px-3 py-1 text-xs text-muted-foreground sm:block">
         {format(new Date(), "EEEE, MMM d")}
@@ -52,7 +52,7 @@ export function TopBar({
         <Search className="size-5" />
       </Button>
       <ThemeToggle />
-      <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+      <Button variant="ghost" size="icon" aria-label="Notifications" className="relative hidden min-[390px]:inline-flex">
         <Bell className="size-4" />
         <span className="absolute right-2 top-2 size-2 rounded-full bg-destructive" />
       </Button>

@@ -39,13 +39,13 @@ export function ArrivingView() {
   }
 
   return (
-    <div className="px-4 py-6 md:px-8">
+    <div className="px-safe py-6 md:px-8">
       <div className="mb-5">
         <h1 className="display-1">Arriving</h1>
         <p className="text-sm text-muted-foreground">Next 14 days, excluding today.</p>
       </div>
       <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
-        <Button size="sm" variant={dateFilter === "all" ? "default" : "outline"} onClick={() => setDateFilter("all")}>
+        <Button className="shrink-0" size="sm" variant={dateFilter === "all" ? "default" : "outline"} onClick={() => setDateFilter("all")}>
           All
         </Button>
         {dateStrip.map((date) => (
@@ -63,7 +63,7 @@ export function ArrivingView() {
       <div className="space-y-8">
         {Object.entries(grouped).map(([date, group]) => (
           <section key={date}>
-            <h2 className="display-3 sticky top-16 z-20 mb-4 bg-background/80 py-2 backdrop-blur">{formatLongDate(date)}</h2>
+            <h2 className="display-3 sticky top-[calc(4rem+var(--safe-top))] z-20 mb-4 bg-background/80 py-2 backdrop-blur">{formatLongDate(date)}</h2>
             <div className="grid guest-card-grid gap-5">
               {group.map((guest) => (
                 <GuestCard

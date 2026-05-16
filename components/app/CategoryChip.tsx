@@ -27,7 +27,7 @@ export function CategoryChip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all duration-200",
+        "relative inline-flex h-10 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all duration-200 sm:h-8",
         count === 0 ? "border-border/70 bg-secondary/40 text-muted-foreground opacity-60" : "border-border bg-background/80 text-foreground shadow-sm hover:-translate-y-0.5",
         active && "ring-2 ring-ring ring-offset-2 ring-offset-background",
         disabled && "cursor-not-allowed"
