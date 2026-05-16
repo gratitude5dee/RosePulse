@@ -114,3 +114,79 @@ export interface GuestCrmState {
   newTicketDraft?: NewTicketDraft;
   unfiledNotes: UnfiledVoiceNote[];
 }
+
+/** Raw intake channel for GuestPulse extraction (text only in MVP). */
+export type IntakeSourceType =
+  | "reservation"
+  | "pre_arrival"
+  | "vip_call"
+  | "staff_note"
+  | "past_stay"
+  | "feedback_survey";
+
+/** Staff-facing department label for routing and demo filters. */
+export type IntakeDepartment =
+  | "front_desk"
+  | "concierge"
+  | "housekeeping"
+  | "fnb"
+  | "spa"
+  | "guest_relations"
+  | "reservations"
+  | "security";
+
+/** Single pasted or synced intake note before extraction. */
+export interface IntakeRecord {
+  id: string;
+  guestId: string;
+  sourceType: IntakeSourceType;
+  sourceDepartment: IntakeDepartment | string;
+  rawText: string;
+  capturedAt: string;
+}
+
+/** How sensitive this signal is if surfaced outside the core guest team. */
+export type GuestSignalPrivacySensitivity = "low" | "medium" | "high";
+
+/** Structured preference or fact inferred from intake (no department actions). */
+export interface GuestSignal {
+  id: string;
+  category: string;
+  value: string;
+  evidence: string;
+  /** 0–1; extractor sets based on text clarity. */
+  confidence: number;
+  privacySensitivity: GuestSignalPrivacySensitivity;
+  sourceRecordIds: string[];
+}
+
+/** Profile handed to downstream action pipelines after merge. */
+export interface EnrichedGuestProfile {
+  guestId: string;
+  identity: {
+    firstName: string;
+    lastName: string;
+    preferredName?: string;
+  };
+  status: GuestStatus;
+  /** Marketing or service segment, e.g. wellness-focused Founder. */
+  segment: string;
+  currentStay: {
+    arrivalDate: string;
+    departureDate: string;
+    roomNumber?: string;
+    roomType: string;
+    partySize: number;
+  };
+  signals: GuestSignal[];
+  summary: string;
+  lastUpdatedAt?: string;
+}
+
+/** One demo guest with CRM row, optional prior signals, and historical intake rows. */
+export interface GuestPulseGuestFixture {
+  guest: Guest;
+  segment: string;
+  existingSignals: GuestSignal[];
+  intakeRecords: IntakeRecord[];
+}
