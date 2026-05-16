@@ -103,6 +103,33 @@ export interface UnfiledVoiceNote {
   filedBy?: string;
 }
 
+export type VoiceNoteMemoStatus = "unfiled" | "filed" | "attached" | "archived";
+
+export type VoiceNoteMemoSource = "unfiled" | "new_ticket" | "ticket_attachment" | "filed_unfiled";
+
+export interface VoiceNoteMemo {
+  id: string;
+  transcript: string;
+  title: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: VoiceNoteMemoStatus;
+  source: VoiceNoteMemoSource;
+  routeConfidence: number;
+  signalCount: number;
+  preferenceCategories: PreferenceCategory[];
+  createdAt: string;
+  updatedAt: string;
+  guestId?: string;
+  ticketId?: string;
+  ticketEventId?: string;
+  unfiledVoiceNoteId?: string;
+  createdBy?: string;
+  filedAt?: string;
+  archivedAt?: string;
+  intelligence?: WalkieIntelligence;
+}
+
 export interface NewTicketDraft {
   guestId?: string;
   category?: TicketCategory;
@@ -167,6 +194,7 @@ export interface GuestCrmState {
   newTicketOpen: boolean;
   newTicketDraft?: NewTicketDraft;
   unfiledNotes: UnfiledVoiceNote[];
+  voiceMemos: VoiceNoteMemo[];
   backend: BackendSyncState;
 }
 

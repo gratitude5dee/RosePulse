@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Plus, Radio, Route, Sparkles, Ticket, UserRound } from "lucide-react";
+import { CalendarDays, Mic2, Plus, Radio, Route, Sparkles, Ticket, UserRound } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -21,7 +21,8 @@ const routes = [
   { href: "/guests", label: "Guests", Icon: UserRound },
   { href: "/guest-pulse", label: "GuestPulse intake", Icon: Sparkles },
   { href: "/tickets", label: "Tickets", Icon: Ticket },
-  { href: "/radio", label: "Radio", Icon: Radio }
+  { href: "/radio", label: "Radio", Icon: Radio },
+  { href: "/voice-notes", label: "Voice Memos", Icon: Mic2 }
 ];
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -66,6 +67,16 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           >
             <Plus className="size-4 text-muted-foreground" />
             New ticket
+          </CommandItem>
+          <CommandItem
+            value="Open voice memos transcripts archive"
+            onSelect={() => {
+              router.push("/voice-notes");
+              close();
+            }}
+          >
+            <Mic2 className="size-4 text-muted-foreground" />
+            Open voice memos
           </CommandItem>
           <CommandItem
             value="Open radio walkie talkie"

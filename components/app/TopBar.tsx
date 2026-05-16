@@ -82,6 +82,7 @@ export function TopBar({
           <DropdownMenuItem>Concierge</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem>Role settings</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => { window.location.href = "/auth/logout"; }}>Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

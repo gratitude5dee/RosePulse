@@ -25,6 +25,7 @@ export const initialGuestCrmState: GuestCrmState = {
   newTicketOpen: false,
   newTicketDraft: undefined,
   unfiledNotes: [],
+  voiceMemos: [],
   backend: {
     mode: isSupabaseConfigured() ? "supabase" : "fixtures",
     status: "idle",

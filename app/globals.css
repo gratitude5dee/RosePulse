@@ -256,6 +256,18 @@ body::before {
   animation: ring-spin 2.2s linear infinite;
 }
 
+.animate-intro-fade-in {
+  animation: intro-fade-in 360ms ease-out both;
+}
+
+.animate-intro-fade-out {
+  animation: intro-fade-out 420ms ease-out both;
+}
+
+.animate-intro-ken-burns {
+  animation: intro-ken-burns 4200ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
 @keyframes recording-pulse {
   0%,
   100% {
@@ -263,6 +275,33 @@ body::before {
   }
   50% {
     transform: scale(1.06);
+  }
+}
+
+@keyframes intro-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes intro-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-ken-burns {
+  from {
+    transform: scale(1.035) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.085) translate3d(-1.2%, -0.6%, 0);
   }
 }
 
@@ -287,7 +326,10 @@ body::before {
   }
 
   .animate-recording-pulse,
-  .animate-ring-spin {
+  .animate-ring-spin,
+  .animate-intro-fade-in,
+  .animate-intro-fade-out,
+  .animate-intro-ken-burns {
     animation: none !important;
   }
 }

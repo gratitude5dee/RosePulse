@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Mic2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +19,7 @@ import {
   guestDisplayName,
   nightCount
 } from "@/lib/format";
-import { selectGuestById, selectTicketsByGuest, sortTickets } from "@/lib/store/selectors";
+import { selectGuestById, selectTicketsByGuest, selectVoiceMemosByGuest, sortTickets } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { Ticket } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
   const { state, dispatch } = useGuestCrm();
   const guest = selectGuestById(state, guestId);
   const tickets = selectTicketsByGuest(state, guestId);
+  const voiceMemos = selectVoiceMemosByGuest(state, guestId);
 
   if (!guest) {
     return <EmptyState title="Guest not found" body="This guest is not in the current Rosewood roster." />;
@@ -114,6 +116,10 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
                   <dt className="text-muted-foreground">Open tickets</dt>
                   <dd>{tickets.filter((ticket) => ticket.status !== "resolved").length}</dd>
                 </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Voice memos</dt>
+                  <dd>{voiceMemos.length}</dd>
+                </div>
               </dl>
               <div className="mt-4 flex flex-wrap gap-2">
                 {guest.tags.map((tag) => (
@@ -165,6 +171,22 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
           <div className="rounded-lg border bg-background/72 p-5">
             <h2 className="display-3">Activity</h2>
             <div className="mt-4 space-y-3">
+              {voiceMemos.map((memo) => (
+                <div key={memo.id} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border bg-secondary/30 p-3 text-sm">
+                  <div className="font-mono text-xs text-muted-foreground">{formatAge(memo.createdAt)}</div>
+                  <div>
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                      <Mic2 className="size-4 text-primary" />
+                      Voice memo · {memo.title}
+                      <Badge variant="outline">{CATEGORY_META[memo.category].label}</Badge>
+                    </p>
+                    <p className="mt-1 text-muted-foreground">{memo.transcript}</p>
+                    {memo.signalCount > 0 ? (
+                      <p className="mt-1 text-xs text-muted-foreground">{memo.signalCount} preference signals linked as evidence.</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
               {events.map((event) => (
                 <div key={event.id} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border bg-secondary/30 p-3 text-sm">
                   <div className="font-mono text-xs text-muted-foreground">{formatAge(event.at)}</div>

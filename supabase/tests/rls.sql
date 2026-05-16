@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(8);
+select plan(11);
 
 insert into public.properties (id, name, slug)
 values
@@ -39,6 +39,10 @@ insert into public.guest_preference_evidence (id, property_id, preference_id, qu
 values ('test_evidence_b', 'test_property_b', 'test_pref_b', 'Cross-property evidence')
 on conflict (id) do nothing;
 
+insert into public.voice_note_memos (id, property_id, transcript, title, category, priority, status, source)
+values ('test_memo_b', 'test_property_b', 'Cross-property memo', 'Cross-property memo', 'guest_relations', 'medium', 'unfiled', 'unfiled')
+on conflict (id) do nothing;
+
 set local role anon;
 select is((select count(*) from public.guests), 0::bigint, 'anon cannot read guests');
 
@@ -57,7 +61,14 @@ values ('test_pref_a', 'test_property_a', 'test_guest_a', 'service', 'Quiet gree
 insert into public.guest_preference_evidence (id, property_id, preference_id, quote)
 values ('test_evidence_a', 'test_property_a', 'test_pref_a', 'Quiet greeting evidence');
 select ok(exists(select 1 from public.guest_preference_evidence where id = 'test_evidence_a'), 'property member can insert and read preference evidence');
+insert into public.voice_note_memos (id, property_id, guest_id, ticket_id, transcript, title, category, priority, status, source)
+values ('test_memo_a', 'test_property_a', 'test_guest_a', 'test_ticket_a', 'Quiet greeting voice memo', 'Quiet greeting', 'guest_relations', 'medium', 'filed', 'new_ticket');
+select ok(exists(select 1 from public.voice_note_memos where id = 'test_memo_a'), 'property member can insert and read voice note memos');
+insert into public.guest_preference_evidence (id, property_id, preference_id, voice_note_memo_id, quote)
+values ('test_evidence_memo_a', 'test_property_a', 'test_pref_a', 'test_memo_a', 'Voice memo evidence');
+select ok(exists(select 1 from public.guest_preference_evidence where voice_note_memo_id = 'test_memo_a'), 'property member can link preference evidence to a voice memo');
 select is((select count(*) from public.guest_preference_evidence where property_id = 'test_property_b'), 0::bigint, 'property member cannot read cross-property preference evidence');
+select is((select count(*) from public.voice_note_memos where property_id = 'test_property_b'), 0::bigint, 'property member cannot read cross-property voice memos');
 update public.guest_preferences
 set status = 'confirmed'
 where id = 'test_pref_a';

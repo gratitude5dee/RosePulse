@@ -1,6 +1,7 @@
 import type { Guest, Ticket, TicketCategory, TicketPriority } from "@/lib/types";
 
 export type VisualAssetKey =
+  | "introPool"
   | "propertyArrival"
   | "guestSuite"
   | "maderaDining"
@@ -15,14 +16,22 @@ export interface VisualAsset {
   alt: string;
   width: number;
   height: number;
-  tone: "arrival" | "room" | "dining" | "wellness" | "outdoor" | "service" | "residential";
+  tone: "intro" | "arrival" | "room" | "dining" | "wellness" | "outdoor" | "service" | "residential";
 }
 
 export const VISUAL_ASSETS: Record<VisualAssetKey, VisualAsset> = {
+  introPool: {
+    key: "introPool",
+    src: "/images/rosewood-sand-hill/intro-pool.webp",
+    alt: "Cinematic pool and garden arrival scene inspired by Rosewood Sand Hill.",
+    width: 1600,
+    height: 900,
+    tone: "intro"
+  },
   propertyArrival: {
     key: "propertyArrival",
     src: "/images/rosewood-sand-hill/property-arrival.webp",
-    alt: "Editorial illustration of a warm Northern California hotel arrival garden at Rosewood Sand Hill.",
+    alt: "Warm Northern California hotel arrival garden inspired by Rosewood Sand Hill.",
     width: 1400,
     height: 840,
     tone: "arrival"
@@ -30,7 +39,7 @@ export const VISUAL_ASSETS: Record<VisualAssetKey, VisualAsset> = {
   guestSuite: {
     key: "guestSuite",
     src: "/images/rosewood-sand-hill/guest-suite.webp",
-    alt: "Editorial illustration of a refined guest room with balcony views over foothill gardens.",
+    alt: "Refined guest suite with balcony views over foothill gardens.",
     width: 1400,
     height: 840,
     tone: "room"
@@ -38,7 +47,7 @@ export const VISUAL_ASSETS: Record<VisualAssetKey, VisualAsset> = {
   maderaDining: {
     key: "maderaDining",
     src: "/images/rosewood-sand-hill/madera-dining.webp",
-    alt: "Editorial illustration of an elegant dining room entry inspired by Madera at Sand Hill.",
+    alt: "Elegant dining room entry inspired by Madera at Sand Hill.",
     width: 1400,
     height: 840,
     tone: "dining"
@@ -46,7 +55,7 @@ export const VISUAL_ASSETS: Record<VisualAssetKey, VisualAsset> = {
   asayaSpa: {
     key: "asayaSpa",
     src: "/images/rosewood-sand-hill/asaya-spa.webp",
-    alt: "Editorial illustration of a quiet spa treatment room with warm wood and soft daylight.",
+    alt: "Quiet spa treatment room with warm wood and soft daylight.",
     width: 1400,
     height: 840,
     tone: "wellness"
@@ -54,7 +63,7 @@ export const VISUAL_ASSETS: Record<VisualAssetKey, VisualAsset> = {
   poolRetreat: {
     key: "poolRetreat",
     src: "/images/rosewood-sand-hill/pool-retreat.webp",
-    alt: "Editorial illustration of a serene pool retreat framed by gardens and distant foothills.",
+    alt: "Serene pool retreat framed by gardens and distant foothills.",
     width: 1400,
     height: 840,
     tone: "outdoor"
@@ -62,7 +71,7 @@ export const VISUAL_ASSETS: Record<VisualAssetKey, VisualAsset> = {
   serviceCorridor: {
     key: "serviceCorridor",
     src: "/images/rosewood-sand-hill/service-corridor.webp",
-    alt: "Editorial illustration of a discreet luxury service corridor prepared for staff handoff.",
+    alt: "Discreet luxury service corridor prepared for staff handoff.",
     width: 1400,
     height: 840,
     tone: "service"
@@ -70,7 +79,7 @@ export const VISUAL_ASSETS: Record<VisualAssetKey, VisualAsset> = {
   residentialVilla: {
     key: "residentialVilla",
     src: "/images/rosewood-sand-hill/residential-villa.webp",
-    alt: "Editorial illustration of a residential villa living space with indoor outdoor foothill views.",
+    alt: "Residential villa living space with indoor outdoor foothill views.",
     width: 1400,
     height: 840,
     tone: "residential"

@@ -6,7 +6,9 @@ import type {
   Staff,
   Ticket,
   TicketEvent,
-  UnfiledVoiceNote
+  UnfiledVoiceNote,
+  VoiceNoteMemo,
+  WalkieIntelligence
 } from "@/lib/types";
 import type { Tables } from "@/lib/supabase/database.types";
 
@@ -19,6 +21,7 @@ export interface RemoteCrmRows {
   tickets: Tables<"tickets">[];
   events: Tables<"ticket_events">[];
   unfiledNotes: Tables<"unfiled_voice_notes">[];
+  voiceMemos: Tables<"voice_note_memos">[];
   preferences: Tables<"guest_preferences">[];
   preferenceEvidence: Tables<"guest_preference_evidence">[];
   recommendations: Tables<"preference_recommendations">[];
@@ -79,8 +82,20 @@ export function mapRemoteRowsToState(rows: RemoteCrmRows, fallback: GuestCrmStat
     tickets,
     staff: rows.staff.map(mapStaff),
     unfiledNotes: rows.unfiledNotes.map(mapUnfiledNote),
+    voiceMemos: rows.voiceMemos.map(mapVoiceMemo),
     preferences: rows.preferences.map((preference) =>
-      mapGuestPreference(preference, (evidenceByPreference.get(preference.id) ?? []).map((evidence) => evidence.ticket_event_id ?? evidence.guest_note_id ?? evidence.unfiled_voice_note_id ?? evidence.ticket_id ?? evidence.id))
+      mapGuestPreference(
+        preference,
+        (evidenceByPreference.get(preference.id) ?? []).map(
+          (evidence) =>
+            evidence.voice_note_memo_id ??
+            evidence.ticket_event_id ??
+            evidence.guest_note_id ??
+            evidence.unfiled_voice_note_id ??
+            evidence.ticket_id ??
+            evidence.id
+        )
+      )
     ),
     recommendations: rows.recommendations.map(mapPreferenceRecommendation)
   };
@@ -123,6 +138,31 @@ function mapUnfiledNote(note: Tables<"unfiled_voice_notes">): UnfiledVoiceNote {
     ticketId: note.ticket_id ?? undefined,
     filedAt: note.filed_at ?? undefined,
     filedBy: note.filed_by ?? undefined
+  };
+}
+
+function mapVoiceMemo(memo: Tables<"voice_note_memos">): VoiceNoteMemo {
+  return {
+    id: memo.id,
+    transcript: memo.transcript,
+    title: memo.title,
+    category: memo.category,
+    priority: memo.priority,
+    status: memo.status,
+    source: memo.source,
+    routeConfidence: memo.route_confidence,
+    signalCount: memo.signal_count,
+    preferenceCategories: memo.preference_categories,
+    createdAt: memo.created_at,
+    updatedAt: memo.updated_at,
+    guestId: memo.guest_id ?? undefined,
+    ticketId: memo.ticket_id ?? undefined,
+    ticketEventId: memo.ticket_event_id ?? undefined,
+    unfiledVoiceNoteId: memo.unfiled_voice_note_id ?? undefined,
+    createdBy: memo.created_by ?? undefined,
+    filedAt: memo.filed_at ?? undefined,
+    archivedAt: memo.archived_at ?? undefined,
+    intelligence: isWalkieIntelligence(memo.intelligence) ? memo.intelligence : undefined
   };
 }
 
@@ -175,4 +215,17 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string) {
     map.set(key, [...(map.get(key) ?? []), item]);
   }
   return map;
+}
+
+function isWalkieIntelligence(value: unknown): value is WalkieIntelligence {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "category" in value &&
+      "priority" in value &&
+      "title" in value &&
+      "routeConfidence" in value &&
+      "signals" in value &&
+      Array.isArray((value as { signals?: unknown }).signals)
+  );
 }

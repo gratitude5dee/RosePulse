@@ -24,6 +24,7 @@ export function PreferencePanel({ guestId }: { guestId: string }) {
   const { state } = useGuestCrm();
   const preferences = selectPreferencesByGuest(state, guestId);
   const recommendations = selectRecommendationsByGuest(state, guestId);
+  const voiceMemoIds = new Set(state.voiceMemos.filter((memo) => memo.guestId === guestId).map((memo) => memo.id));
 
   if (preferences.length === 0 && recommendations.length === 0) {
     return (
@@ -67,6 +68,7 @@ export function PreferencePanel({ guestId }: { guestId: string }) {
                 <Badge variant="outline">{CATEGORY_LABELS[preference.category]}</Badge>
                 <span>{preference.sourceType.replace("_", " ")}</span>
                 <span>{preference.evidenceIds.length} evidence links</span>
+                {preference.evidenceIds.some((id) => voiceMemoIds.has(id)) ? <Badge variant="champagne">Voice memo evidence</Badge> : null}
                 <span>{formatAge(preference.updatedAt)}</span>
               </div>
             </article>

@@ -285,6 +285,58 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["unfiled_voice_notes"]["Insert"]>;
         Relationships: [];
       };
+      voice_note_memos: {
+        Row: {
+          id: string;
+          property_id: string;
+          guest_id: string | null;
+          ticket_id: string | null;
+          ticket_event_id: string | null;
+          unfiled_voice_note_id: string | null;
+          transcript: string;
+          title: string;
+          category: Database["public"]["Enums"]["ticket_category"];
+          priority: Database["public"]["Enums"]["ticket_priority"];
+          status: Database["public"]["Enums"]["voice_note_memo_status"];
+          source: Database["public"]["Enums"]["voice_note_memo_source"];
+          route_confidence: number;
+          signal_count: number;
+          preference_categories: Database["public"]["Enums"]["preference_category"][];
+          intelligence: Json;
+          created_by: string | null;
+          filed_by: string | null;
+          created_at: string;
+          updated_at: string;
+          filed_at: string | null;
+          archived_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          guest_id?: string | null;
+          ticket_id?: string | null;
+          ticket_event_id?: string | null;
+          unfiled_voice_note_id?: string | null;
+          transcript: string;
+          title: string;
+          category?: Database["public"]["Enums"]["ticket_category"];
+          priority?: Database["public"]["Enums"]["ticket_priority"];
+          status?: Database["public"]["Enums"]["voice_note_memo_status"];
+          source?: Database["public"]["Enums"]["voice_note_memo_source"];
+          route_confidence?: number;
+          signal_count?: number;
+          preference_categories?: Database["public"]["Enums"]["preference_category"][];
+          intelligence?: Json;
+          created_by?: string | null;
+          filed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          filed_at?: string | null;
+          archived_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["voice_note_memos"]["Insert"]>;
+        Relationships: [];
+      };
       voice_note_assets: {
         Row: {
           id: string;
@@ -322,6 +374,7 @@ export type Database = {
           confidence: number;
           status: Database["public"]["Enums"]["preference_status"];
           source_type: Database["public"]["Enums"]["preference_source_type"];
+          dedupe_key: string | null;
           embedding: string | null;
           created_at: string;
           updated_at: string;
@@ -338,6 +391,7 @@ export type Database = {
           confidence?: number;
           status?: Database["public"]["Enums"]["preference_status"];
           source_type: Database["public"]["Enums"]["preference_source_type"];
+          dedupe_key?: string | null;
           embedding?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -356,6 +410,7 @@ export type Database = {
           ticket_event_id: string | null;
           guest_note_id: string | null;
           unfiled_voice_note_id: string | null;
+          voice_note_memo_id: string | null;
           quote: string | null;
           created_at: string;
         };
@@ -367,6 +422,7 @@ export type Database = {
           ticket_event_id?: string | null;
           guest_note_id?: string | null;
           unfiled_voice_note_id?: string | null;
+          voice_note_memo_id?: string | null;
           quote?: string | null;
           created_at?: string;
         };
@@ -433,7 +489,12 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      save_walkie_voice_memo: {
+        Args: { p_payload: Json };
+        Returns: Json;
+      };
+    };
     Enums: {
       staff_role:
         | "concierge"
@@ -454,6 +515,8 @@ export type Database = {
       preference_status: "candidate" | "confirmed" | "dismissed";
       preference_source_type: "tag" | "note" | "ticket" | "voice_note" | "staff";
       recommendation_status: "pending" | "accepted" | "dismissed";
+      voice_note_memo_status: "unfiled" | "filed" | "attached" | "archived";
+      voice_note_memo_source: "unfiled" | "new_ticket" | "ticket_attachment" | "filed_unfiled";
     };
     CompositeTypes: Record<string, never>;
   };

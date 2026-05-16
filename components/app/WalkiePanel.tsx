@@ -194,12 +194,14 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           title: intelligence.title || transcriptTitle(clean)
         }
       : undefined;
+    const memoId = makeClientId("memo");
 
     if (guestId === "unfiled") {
       dispatch({
         type: "ADD_UNFILED_NOTE",
         payload: {
           noteId: makeClientId("u"),
+          memoId,
           transcript: clean,
           category,
           priority,
@@ -214,6 +216,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           ticketId,
           transcript: clean,
           eventId: makeClientId("e"),
+          memoId,
           intelligence: saveIntelligence
         }
       });
@@ -225,6 +228,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           ticketId: makeClientId("t"),
           createdEventId: makeClientId("e"),
           voiceNoteEventId: makeClientId("e"),
+          memoId,
           guestId,
           category,
           priority,

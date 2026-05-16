@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Sidebar } from "@/components/app/Sidebar";
 import { TopBar } from "@/components/app/TopBar";
 import { GuestDetail } from "@/components/app/GuestDetail";
+import { CinematicIntro } from "@/components/app/CinematicIntro";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useGuestCrm } from "@/lib/store/store-context";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <NewTicketDialog />
+      <CinematicIntro />
     </div>
   );
 }

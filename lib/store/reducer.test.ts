@@ -15,6 +15,7 @@ const baseState: GuestCrmState = {
   newTicketOpen: false,
   newTicketDraft: undefined,
   unfiledNotes: [],
+  voiceMemos: [],
   backend: {
     mode: "fixtures",
     status: "idle",
@@ -33,6 +34,7 @@ describe("guestCrmReducer walkie intelligence", () => {
         ticketId: "t_known",
         createdEventId: "e_created",
         voiceNoteEventId: "e_voice",
+        memoId: "memo_known",
         guestId: "g_1",
         category: intelligence.category,
         priority: intelligence.priority,
@@ -48,6 +50,15 @@ describe("guestCrmReducer walkie intelligence", () => {
     expect(next.preferences.length).toBeGreaterThan(0);
     expect(next.preferences[0]?.sourceType).toBe("voice_note");
     expect(next.preferences[0]?.evidenceIds).toContain("e_voice");
+    expect(next.preferences[0]?.evidenceIds).toContain("memo_known");
+    expect(next.voiceMemos[0]).toMatchObject({
+      id: "memo_known",
+      status: "filed",
+      source: "new_ticket",
+      guestId: "g_1",
+      ticketId: "t_known",
+      ticketEventId: "e_voice"
+    });
   });
 
   it("attaches voice notes to existing tickets and links extracted signals to the event", () => {
@@ -74,12 +85,19 @@ describe("guestCrmReducer walkie intelligence", () => {
         ticketId: existingTicket.id,
         transcript,
         eventId: "e_voice_existing",
+        memoId: "memo_attached",
         intelligence
       }
     });
 
     expect(next.tickets[0]?.events[0]?.id).toBe("e_voice_existing");
     expect(next.preferences.some((preference) => preference.evidenceIds.includes("e_voice_existing"))).toBe(true);
+    expect(next.voiceMemos[0]).toMatchObject({
+      id: "memo_attached",
+      status: "attached",
+      source: "ticket_attachment",
+      ticketId: existingTicket.id
+    });
   });
 
   it("keeps unfiled intelligence and applies it when the note is filed to a guest", () => {
@@ -89,6 +107,7 @@ describe("guestCrmReducer walkie intelligence", () => {
       type: "ADD_UNFILED_NOTE",
       payload: {
         noteId: "u_known",
+        memoId: "memo_unfiled",
         transcript,
         category: intelligence.category,
         priority: intelligence.priority,
@@ -100,6 +119,7 @@ describe("guestCrmReducer walkie intelligence", () => {
       type: "FILE_UNFILED_NOTE",
       payload: {
         noteId: "u_known",
+        memoId: "memo_unfiled",
         guestId: "g_1",
         ticketId: "t_filed",
         createdEventId: "e_created_filed",
@@ -110,5 +130,53 @@ describe("guestCrmReducer walkie intelligence", () => {
     expect(filed.tickets[0]?.id).toBe("t_filed");
     expect(filed.preferences.some((preference) => preference.evidenceIds.includes("e_voice_filed"))).toBe(true);
     expect(filed.unfiledNotes[0]?.filedAt).toBeDefined();
+    expect(filed.voiceMemos[0]).toMatchObject({
+      id: "memo_unfiled",
+      status: "filed",
+      source: "filed_unfiled",
+      guestId: "g_1",
+      ticketId: "t_filed",
+      ticketEventId: "e_voice_filed"
+    });
+  });
+
+  it("deduplicates repeated voice-derived preference candidates for the same guest", () => {
+    const transcript = "Guest has a shellfish allergy for dinner tonight and asked chef to avoid dairy.";
+    const intelligence = analyzeWalkieTranscript({ transcript, guestId: "g_1" });
+    const first = guestCrmReducer(baseState, {
+      type: "CREATE_TICKET",
+      payload: {
+        ticketId: "t_first",
+        createdEventId: "e_created_first",
+        voiceNoteEventId: "e_voice_first",
+        memoId: "memo_first",
+        guestId: "g_1",
+        category: intelligence.category,
+        priority: intelligence.priority,
+        title: intelligence.title,
+        detail: transcript,
+        voiceNote: true,
+        intelligence
+      }
+    });
+    const second = guestCrmReducer(first, {
+      type: "CREATE_TICKET",
+      payload: {
+        ticketId: "t_second",
+        createdEventId: "e_created_second",
+        voiceNoteEventId: "e_voice_second",
+        memoId: "memo_second",
+        guestId: "g_1",
+        category: intelligence.category,
+        priority: intelligence.priority,
+        title: intelligence.title,
+        detail: transcript,
+        voiceNote: true,
+        intelligence
+      }
+    });
+
+    expect(second.voiceMemos).toHaveLength(2);
+    expect(second.preferences).toHaveLength(first.preferences.length);
   });
 });

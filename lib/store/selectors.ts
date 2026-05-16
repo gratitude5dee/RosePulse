@@ -1,7 +1,17 @@
 import { addDays, isAfter, isBefore, isSameDay, parseISO } from "date-fns";
 import { PRIORITY_META } from "@/lib/categories";
 import { businessToday, guestDisplayName } from "@/lib/format";
-import type { Guest, GuestCrmState, GuestStatus, Ticket, TicketCategory, TicketPriority, TicketStatus } from "@/lib/types";
+import type {
+  Guest,
+  GuestCrmState,
+  GuestStatus,
+  PreferenceCategory,
+  Ticket,
+  TicketCategory,
+  TicketPriority,
+  TicketStatus,
+  VoiceNoteMemoStatus
+} from "@/lib/types";
 
 export interface GuestFilters {
   search?: string;
@@ -15,6 +25,17 @@ export interface TicketFilters {
   priority?: TicketPriority | "all";
   status?: TicketStatus | "all";
   assignedTo?: string | "all";
+}
+
+export interface VoiceMemoFilters {
+  search?: string;
+  guestId?: string | "all";
+  category?: TicketCategory | "all";
+  priority?: TicketPriority | "all";
+  status?: VoiceNoteMemoStatus | "all";
+  preferenceCategory?: PreferenceCategory | "all";
+  from?: string;
+  to?: string;
 }
 
 export function isActiveTicket(ticket: Ticket) {
@@ -94,6 +115,44 @@ export function selectRecommendationsByGuest(state: GuestCrmState, guestId: stri
   return state.recommendations
     .filter((recommendation) => recommendation.guestId === guestId && recommendation.status === "pending")
     .toSorted((a, b) => b.confidence - a.confidence || b.createdAt.localeCompare(a.createdAt));
+}
+
+export function selectVoiceMemos(state: GuestCrmState, filters: VoiceMemoFilters = {}) {
+  const search = filters.search?.trim().toLowerCase() ?? "";
+  return state.voiceMemos
+    .filter((memo) => {
+      const searchable = [memo.title, memo.transcript, memo.guestId ?? "", memo.ticketId ?? "", memo.category, memo.priority]
+        .join(" ")
+        .toLowerCase();
+      const matchesSearch = !search || searchable.includes(search);
+      const matchesGuest = !filters.guestId || filters.guestId === "all" || memo.guestId === filters.guestId;
+      const matchesCategory = !filters.category || filters.category === "all" || memo.category === filters.category;
+      const matchesPriority = !filters.priority || filters.priority === "all" || memo.priority === filters.priority;
+      const matchesStatus = !filters.status || filters.status === "all" || memo.status === filters.status;
+      const matchesPreferenceCategory =
+        !filters.preferenceCategory ||
+        filters.preferenceCategory === "all" ||
+        memo.preferenceCategories.includes(filters.preferenceCategory);
+      const matchesFrom = !filters.from || memo.createdAt.slice(0, 10) >= filters.from;
+      const matchesTo = !filters.to || memo.createdAt.slice(0, 10) <= filters.to;
+      return (
+        matchesSearch &&
+        matchesGuest &&
+        matchesCategory &&
+        matchesPriority &&
+        matchesStatus &&
+        matchesPreferenceCategory &&
+        matchesFrom &&
+        matchesTo
+      );
+    })
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function selectVoiceMemosByGuest(state: GuestCrmState, guestId: string) {
+  return state.voiceMemos
+    .filter((memo) => memo.guestId === guestId && memo.status !== "archived")
+    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function selectOpenTicketCountByGuest(state: GuestCrmState, guestId: string) {

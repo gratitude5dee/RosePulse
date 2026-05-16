@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Home, Radio, Settings, Sparkles, Ticket, UsersRound } from "lucide-react";
+import { CalendarDays, Home, Mic2, Radio, Settings, Sparkles, Ticket, UsersRound } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,8 @@ const navItems = [
   { href: "/guests", label: "Guests", Icon: UsersRound },
   { href: "/guest-pulse", label: "GuestPulse", Icon: Sparkles },
   { href: "/tickets", label: "Tickets", Icon: Ticket },
-  { href: "/radio", label: "Radio", Icon: Radio }
+  { href: "/radio", label: "Radio", Icon: Radio },
+  { href: "/voice-notes", label: "Voice Memos", Icon: Mic2 }
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
