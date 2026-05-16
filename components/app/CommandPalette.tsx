@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Plus, Radio, Route, Ticket, UserRound } from "lucide-react";
+import { CalendarDays, Plus, Radio, Route, Sparkles, Ticket, UserRound } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -19,6 +19,7 @@ const routes = [
   { href: "/today", label: "Today", Icon: CalendarDays },
   { href: "/arriving", label: "Arriving", Icon: CalendarDays },
   { href: "/guests", label: "Guests", Icon: UserRound },
+  { href: "/guest-pulse", label: "GuestPulse intake", Icon: Sparkles },
   { href: "/tickets", label: "Tickets", Icon: Ticket },
   { href: "/radio", label: "Radio", Icon: Radio }
 ];
