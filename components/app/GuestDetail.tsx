@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +22,7 @@ import { selectGuestById, selectTicketsByGuest, sortTickets } from "@/lib/store/
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { Ticket } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { getGuestVisualAsset } from "@/lib/visual-assets";
 
 export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode?: "route" | "drawer" }) {
   const { state, dispatch } = useGuestCrm();
@@ -35,6 +37,7 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
     .flatMap((ticket) => ticket.events.map((event) => ({ ...event, ticket })))
     .toSorted((a, b) => b.at.localeCompare(a.at));
   const currentGuestId = guest.id;
+  const visual = getGuestVisualAsset(guest, tickets);
 
   function openTicket(ticket: Ticket) {
     dispatch({ type: "OPEN_GUEST_DETAIL", payload: { guestId: currentGuestId, ticketId: ticket.id } });
@@ -43,8 +46,18 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
 
   return (
     <div className={cn("mx-auto w-full max-w-5xl", mode === "drawer" ? "pb-8" : "px-safe py-6 md:px-8")}>
-      <section className="rounded-lg border bg-background/72 p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      <section className="overflow-hidden rounded-lg border bg-background/72 shadow-sm">
+        <div className="relative h-36 sm:h-44">
+          <Image
+            src={visual.src}
+            alt={visual.alt}
+            fill
+            sizes={mode === "drawer" ? "640px" : "(min-width: 1440px) calc(100vw - 680px), 100vw"}
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,oklch(0.18_0.015_60/0.28))]" />
+        </div>
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
           <GuestAvatar guest={guest} className="size-16" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">

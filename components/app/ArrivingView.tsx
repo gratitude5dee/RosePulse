@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { GuestCard } from "@/components/app/GuestCard";
+import { PropertyMasthead } from "@/components/app/PropertyMasthead";
 import { businessToday, formatLongDate } from "@/lib/format";
 import { selectGuestsArrivingWithin, selectTicketsByGuest } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { Guest, TicketCategory } from "@/lib/types";
+import { VISUAL_ASSETS } from "@/lib/visual-assets";
 import { cn } from "@/lib/utils";
 
 export function ArrivingView() {
@@ -40,6 +42,12 @@ export function ArrivingView() {
 
   return (
     <div className="px-safe py-6 md:px-8">
+      <PropertyMasthead
+        asset={VISUAL_ASSETS.poolRetreat}
+        eyebrow="Arrivals · Next 14 days"
+        title="Upcoming stays"
+        body="A calm forward view of the guests, occasions, and service details approaching the property."
+      />
       <div className="mb-5">
         <h1 className="display-1">Arriving</h1>
         <p className="text-sm text-muted-foreground">Next 14 days, excluding today.</p>

@@ -8,6 +8,7 @@ import { formatAge } from "@/lib/format";
 import { selectPreferencesByGuest, selectRecommendationsByGuest } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { PreferenceCategory } from "@/lib/types";
+import { VISUAL_ASSETS } from "@/lib/visual-assets";
 
 const CATEGORY_LABELS: Record<PreferenceCategory, string> = {
   dining: "Dining",
@@ -30,6 +31,7 @@ export function PreferencePanel({ guestId }: { guestId: string }) {
         title="Preference intelligence is ready."
         body="Signals from tickets, staff notes, tags, and walkie transcripts will appear here after the Supabase extractor records evidence."
         icon={Sparkles}
+        image={VISUAL_ASSETS.asayaSpa}
       />
     );
   }

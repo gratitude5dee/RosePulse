@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { MessageCircle, Plus, Star, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { guestDisplayName, staySummary } from "@/lib/format";
 import { isActiveTicket, sortTickets } from "@/lib/store/selectors";
 import type { Guest, Ticket, TicketCategory, TicketPriority } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { getGuestVisualAsset } from "@/lib/visual-assets";
 
 export function GuestCard({
   guest,
@@ -32,6 +34,7 @@ export function GuestCard({
   const longPressRef = useRef<number | null>(null);
 
   const activeTickets = useMemo(() => tickets.filter(isActiveTicket).toSorted(sortTickets), [tickets]);
+  const visual = useMemo(() => getGuestVisualAsset(guest, activeTickets), [guest, activeTickets]);
   const categoryCounts = useMemo(() => {
     return CATEGORY_ORDER.reduce<Record<TicketCategory, { count: number; peak?: TicketPriority }>>((acc, category) => {
       const categoryTickets = activeTickets.filter((ticket) => ticket.category === category);
@@ -66,12 +69,23 @@ export function GuestCard({
   return (
     <article
       data-tier="editorial"
-      className={cn("flex min-h-[340px] flex-col rounded-lg p-4 sm:min-h-[360px] sm:p-5", className)}
+      className={cn("flex min-h-[420px] flex-col overflow-hidden rounded-lg p-4 sm:min-h-[440px] sm:p-5", className)}
       onPointerDown={startLongPress}
       onPointerUp={clearLongPress}
       onPointerLeave={clearLongPress}
       onPointerCancel={clearLongPress}
     >
+      <div className="relative -mx-4 -mt-4 mb-4 h-28 overflow-hidden rounded-t-[calc(var(--radius)-1px)] bg-secondary sm:-mx-5 sm:-mt-5 sm:mb-5 sm:h-32">
+        <Image
+          src={visual.src}
+          alt={visual.alt}
+          fill
+          sizes="(min-width: 1536px) 25vw, (min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_42%,oklch(0.18_0.015_60/0.22))]" />
+      </div>
+
       <div className="flex items-start gap-3">
         <GuestAvatar guest={guest} className="size-11 sm:size-12" />
         <div className="min-w-0 flex-1">

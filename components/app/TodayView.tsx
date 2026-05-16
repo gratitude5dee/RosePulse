@@ -3,11 +3,13 @@
 import { Inbox } from "lucide-react";
 import { GuestCard } from "@/components/app/GuestCard";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PropertyMasthead } from "@/components/app/PropertyMasthead";
 import { formatLongDate, guestDisplayName } from "@/lib/format";
 import { makeClientId } from "@/lib/id";
 import { selectGuestsArrivingToday, selectTicketsByGuest } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { Guest, TicketCategory } from "@/lib/types";
+import { VISUAL_ASSETS } from "@/lib/visual-assets";
 
 export function TodayView() {
   const { state, dispatch } = useGuestCrm();
@@ -32,6 +34,13 @@ export function TodayView() {
 
   return (
     <div className="px-safe py-6 md:px-8">
+      <PropertyMasthead
+        asset={VISUAL_ASSETS.propertyArrival}
+        eyebrow="RosePulse · Sand Hill"
+        title="Rosewood Sand Hill"
+        body="Menlo Park service rhythm across arrivals, rooms, dining, wellness, and active guest care."
+        priority
+      />
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="display-1">Today</h1>

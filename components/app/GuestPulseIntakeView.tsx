@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { ClipboardCopy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { guestDisplayName } from "@/lib/format";
 import { guestPulseMockGuests } from "@/lib/mockGuests";
 import type { EnrichedGuestProfile, GuestSignal, IntakeDepartment, IntakeSourceType } from "@/lib/types";
+import { VISUAL_ASSETS } from "@/lib/visual-assets";
 
 const ELEANOR_ID = "ing_eleanor";
 const ADRIAN_ID = "ing_adrian";
@@ -178,11 +180,23 @@ export function GuestPulseIntakeView() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 pb-16 lg:p-6">
-      <div className="space-y-1">
-        <h1 className="font-serif text-2xl font-medium tracking-tight">GuestPulse intake</h1>
-        <p className="text-sm text-muted-foreground">
-          Paste raw intake text, extract structured signals, and copy the enriched payload for downstream actions.
-        </p>
+      <div className="grid gap-4 overflow-hidden rounded-lg border bg-background/72 p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
+        <div className="space-y-1">
+          <h1 className="font-serif text-2xl font-medium tracking-tight">GuestPulse intake</h1>
+          <p className="text-sm text-muted-foreground">
+            Paste raw intake text, extract structured signals, and copy the enriched payload for downstream actions.
+          </p>
+        </div>
+        <div className="relative hidden h-28 overflow-hidden rounded-md border bg-secondary sm:block">
+          <Image
+            src={VISUAL_ASSETS.maderaDining.src}
+            alt={VISUAL_ASSETS.maderaDining.alt}
+            fill
+            sizes="220px"
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,oklch(0.18_0.015_60/0.16))]" />
+        </div>
       </div>
 
       <Card>
