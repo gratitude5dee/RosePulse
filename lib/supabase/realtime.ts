@@ -3,7 +3,7 @@
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { ROSEPULSE_PROPERTY_ID, isSupabaseConfigured } from "@/lib/supabase/config";
 
-const REALTIME_TABLES = ["tickets", "ticket_events", "unfiled_voice_notes", "guest_preferences"] as const;
+const REALTIME_TABLES = ["tickets", "ticket_events", "unfiled_voice_notes", "guest_preferences", "guest_preference_evidence"] as const;
 
 export function subscribeToGuestCrmChanges(onChange: () => void) {
   if (!isSupabaseConfigured()) return () => undefined;

@@ -96,6 +96,7 @@ export interface UnfiledVoiceNote {
   category: TicketCategory;
   priority: TicketPriority;
   createdAt: string;
+  intelligence?: WalkieIntelligence;
   guestId?: string;
   ticketId?: string;
   filedAt?: string;
@@ -176,7 +177,22 @@ export type IntakeSourceType =
   | "vip_call"
   | "staff_note"
   | "past_stay"
-  | "feedback_survey";
+  | "feedback_survey"
+  | "voice_note";
+
+export interface WalkiePreferenceSignal extends GuestSignal {
+  preferenceCategory: PreferenceCategory;
+  label: string;
+  detail: string;
+}
+
+export interface WalkieIntelligence {
+  category: TicketCategory;
+  priority: TicketPriority;
+  title: string;
+  routeConfidence: number;
+  signals: WalkiePreferenceSignal[];
+}
 
 /** Staff-facing department label for routing and demo filters. */
 export type IntakeDepartment =

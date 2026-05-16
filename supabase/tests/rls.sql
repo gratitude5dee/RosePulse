@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(6);
+select plan(8);
 
 insert into public.properties (id, name, slug)
 values
@@ -31,6 +31,14 @@ values
   ('test_guest_b', 'test_property_b', 'Bea', 'B')
 on conflict (id) do nothing;
 
+insert into public.guest_preferences (id, property_id, guest_id, category, label, detail, confidence, status, source_type)
+values ('test_pref_b', 'test_property_b', 'test_guest_b', 'service', 'Cross property preference', 'Should not be visible to property A.', 0.7, 'candidate', 'staff')
+on conflict (id) do nothing;
+
+insert into public.guest_preference_evidence (id, property_id, preference_id, quote)
+values ('test_evidence_b', 'test_property_b', 'test_pref_b', 'Cross-property evidence')
+on conflict (id) do nothing;
+
 set local role anon;
 select is((select count(*) from public.guests), 0::bigint, 'anon cannot read guests');
 
@@ -46,6 +54,10 @@ select ok(exists(select 1 from public.tickets where id = 'test_ticket_a'), 'prop
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
 insert into public.guest_preferences (id, property_id, guest_id, category, label, detail, confidence, status, source_type)
 values ('test_pref_a', 'test_property_a', 'test_guest_a', 'service', 'Quiet greeting', 'Use a low-friction arrival touchpoint.', 0.7, 'candidate', 'staff');
+insert into public.guest_preference_evidence (id, property_id, preference_id, quote)
+values ('test_evidence_a', 'test_property_a', 'test_pref_a', 'Quiet greeting evidence');
+select ok(exists(select 1 from public.guest_preference_evidence where id = 'test_evidence_a'), 'property member can insert and read preference evidence');
+select is((select count(*) from public.guest_preference_evidence where property_id = 'test_property_b'), 0::bigint, 'property member cannot read cross-property preference evidence');
 update public.guest_preferences
 set status = 'confirmed'
 where id = 'test_pref_a';

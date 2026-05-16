@@ -4,6 +4,7 @@ import { Inbox } from "lucide-react";
 import { GuestCard } from "@/components/app/GuestCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { formatLongDate, guestDisplayName } from "@/lib/format";
+import { makeClientId } from "@/lib/id";
 import { selectGuestsArrivingToday, selectTicketsByGuest } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { Guest, TicketCategory } from "@/lib/types";
@@ -59,7 +60,17 @@ export function TodayView() {
                   defaultValue=""
                   onChange={(event) => {
                     if (event.target.value) {
-                      dispatch({ type: "FILE_UNFILED_NOTE", payload: { noteId: note.id, guestId: event.target.value } });
+                      dispatch({
+                        type: "FILE_UNFILED_NOTE",
+                        payload: {
+                          noteId: note.id,
+                          guestId: event.target.value,
+                          ticketId: makeClientId("t"),
+                          createdEventId: makeClientId("e"),
+                          voiceNoteEventId: makeClientId("e"),
+                          intelligence: note.intelligence
+                        }
+                      });
                     }
                   }}
                 >

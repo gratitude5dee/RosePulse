@@ -177,6 +177,16 @@ function extractWellnessAndRoutine(raw: string, record: IntakeRecord): GuestSign
     });
   }
 
+  if (/\b(spa|massage|hammam|treatment|sauna)\b/i.test(raw)) {
+    out.push({
+      category: "wellness_routine",
+      value: "Wellness or spa treatment interest noted for proactive service timing",
+      evidence: contextAround(raw, /\b(spa|massage|hammam|treatment|sauna)\b/i) ?? clipEvidence(raw),
+      confidence: 0.74,
+      privacySensitivity: "low"
+    });
+  }
+
   return withSource(record, out);
 }
 
@@ -286,6 +296,16 @@ function extractSleepEnvironment(raw: string, record: IntakeRecord): GuestSignal
       value: "Prefers no turn-down music",
       evidence: contextAround(raw, /\bturn[- ]?down\s+music\b/i) ?? clipEvidence(raw),
       confidence: 0.84,
+      privacySensitivity: "low"
+    });
+  }
+
+  if (/\bfirm\s+mattress\b/i.test(raw) || (/\bquiet\s+room\b/i.test(raw) && /\belevator\b/i.test(raw))) {
+    out.push({
+      category: "sleep_environment",
+      value: "Prefers firm mattress and quiet room placement",
+      evidence: contextAround(raw, /\b(firm\s+mattress|quiet\s+room|elevator)\b/i) ?? clipEvidence(raw),
+      confidence: 0.78,
       privacySensitivity: "low"
     });
   }

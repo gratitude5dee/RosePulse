@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Clipboard, Mic, MicOff, Radio, RotateCcw, Save, Send } from "lucide-react";
+import { Clipboard, Mic, MicOff, Radio, RotateCcw, Save, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Waveform } from "@/components/app/Waveform";
 import { CATEGORY_META, CATEGORY_ORDER, PRIORITY_META, PRIORITY_ORDER } from "@/lib/categories";
-import { classifyTranscript } from "@/lib/transcript-classifier";
 import { guestDisplayName, transcriptTitle } from "@/lib/format";
+import { makeClientId } from "@/lib/id";
 import { selectTicketsByGuest } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
-import type { TicketCategory, TicketPriority } from "@/lib/types";
+import type { TicketCategory, TicketPriority, WalkieIntelligence } from "@/lib/types";
 import { useWalkie } from "@/hooks/use-walkie";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,10 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [typedFallback, setTypedFallback] = useState("");
   const [categoryTouched, setCategoryTouched] = useState(false);
+  const [priorityTouched, setPriorityTouched] = useState(false);
+  const [intelligence, setIntelligence] = useState<WalkieIntelligence | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const walkie = useWalkie({
     onAutoStop: () => toast.warning("Walkie auto-stopped", { description: "Release and re-engage to continue." })
@@ -51,14 +56,70 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
   const micUnavailable = walkie.permissionState === "unsupported" || !walkie.micSupported;
 
   useEffect(() => {
-    if (!categoryTouched && transcript.trim()) {
-      setCategory(classifyTranscript(transcript).category);
+    const clean = transcript.trim();
+    if (!clean) {
+      setIntelligence(null);
+      setAnalysisError(null);
+      setIsAnalyzing(false);
+      return;
     }
-  }, [categoryTouched, transcript]);
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setIsAnalyzing(true);
+      setAnalysisError(null);
+      void fetch("/api/walkie/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: clean,
+          guestId: guestId === "unfiled" ? undefined : guestId,
+          ticketId: ticketId === "new" ? undefined : ticketId
+        }),
+        signal: controller.signal
+      })
+        .then(async (response) => {
+          const data: unknown = await response.json().catch(() => null);
+          if (!response.ok) {
+            const message =
+              data && typeof data === "object" && "error" in data && typeof data.error === "string"
+                ? data.error
+                : "Walkie analysis failed";
+            throw new Error(message);
+          }
+          if (!isWalkieIntelligence(data)) {
+            throw new Error("Walkie analysis returned an unexpected response.");
+          }
+          setIntelligence(data);
+          if (ticketId === "new") {
+            if (!categoryTouched) setCategory(data.category);
+            if (!priorityTouched) setPriority(data.priority);
+          }
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          setIntelligence(null);
+          setAnalysisError(error instanceof Error ? error.message : "Walkie analysis failed");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsAnalyzing(false);
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [categoryTouched, guestId, priorityTouched, ticketId, transcript]);
 
   function handleCategoryChange(value: TicketCategory) {
     setCategoryTouched(true);
     setCategory(value);
+  }
+
+  function handlePriorityChange(value: TicketPriority) {
+    setPriorityTouched(true);
+    setPriority(value);
   }
 
   function pointerDown(event: React.PointerEvent<HTMLButtonElement>) {
@@ -105,6 +166,10 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
   function discard() {
     walkie.clearTranscript();
     setTypedFallback("");
+    setIntelligence(null);
+    setAnalysisError(null);
+    setCategoryTouched(false);
+    setPriorityTouched(false);
     toast.message("Transcript discarded");
   }
 
@@ -121,34 +186,70 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
       return;
     }
 
+    const saveIntelligence = intelligence
+      ? {
+          ...intelligence,
+          category,
+          priority,
+          title: intelligence.title || transcriptTitle(clean)
+        }
+      : undefined;
+
     if (guestId === "unfiled") {
-      dispatch({ type: "ADD_UNFILED_NOTE", payload: { transcript: clean, category, priority } });
+      dispatch({
+        type: "ADD_UNFILED_NOTE",
+        payload: {
+          noteId: makeClientId("u"),
+          transcript: clean,
+          category,
+          priority,
+          intelligence: saveIntelligence
+        }
+      });
       toast.success("Saved to Unfiled", { description: "File it to a guest when ready." });
     } else if (ticketId !== "new") {
-      dispatch({ type: "ADD_VOICE_NOTE", payload: { ticketId, transcript: clean } });
-      toast.success("Voice note attached");
+      dispatch({
+        type: "ADD_VOICE_NOTE",
+        payload: {
+          ticketId,
+          transcript: clean,
+          eventId: makeClientId("e"),
+          intelligence: saveIntelligence
+        }
+      });
+      toast.success("Voice note attached", { description: saveIntelligence?.signals.length ? "GuestPulse signals captured." : undefined });
     } else {
       dispatch({
         type: "CREATE_TICKET",
         payload: {
+          ticketId: makeClientId("t"),
+          createdEventId: makeClientId("e"),
+          voiceNoteEventId: makeClientId("e"),
           guestId,
           category,
           priority,
-          title: transcriptTitle(clean),
+          title: saveIntelligence?.title ?? transcriptTitle(clean),
           detail: clean,
-          voiceNote: true
+          voiceNote: true,
+          intelligence: saveIntelligence
         }
       });
-      toast.success("Voice ticket created");
+      toast.success("Voice ticket created", { description: saveIntelligence?.signals.length ? "GuestPulse signals captured." : undefined });
     }
 
     walkie.clearTranscript();
     setTypedFallback("");
+    setIntelligence(null);
+    setAnalysisError(null);
+    setCategoryTouched(false);
+    setPriorityTouched(false);
   }
 
   const isFull = variant === "full";
   const statusText = walkie.isTranscribing
     ? "Transcribing..."
+    : isAnalyzing
+      ? "Analyzing route..."
     : walkie.isRecording
       ? walkie.speechSupported
         ? "Listening..."
@@ -230,7 +331,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
         </div>
         <div className="grid gap-1.5">
           <Label>Priority</Label>
-          <Select value={priority} onValueChange={(value) => setPriority(value as TicketPriority)}>
+          <Select value={priority} onValueChange={(value) => handlePriorityChange(value as TicketPriority)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -343,10 +444,44 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           )}
         </div>
 
+        {isAnalyzing || intelligence || analysisError ? (
+          <div className="rounded-md border bg-background/55 p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              <span className="font-medium">{isAnalyzing ? "Analyzing GuestPulse signals" : "Auto-routed"}</span>
+              {intelligence ? (
+                <>
+                  <Badge variant="outline">{CATEGORY_META[intelligence.category].label}</Badge>
+                  <Badge variant="secondary">{PRIORITY_META[intelligence.priority].label}</Badge>
+                  <span className="text-xs text-muted-foreground">{Math.round(intelligence.routeConfidence * 100)}% route confidence</span>
+                </>
+              ) : null}
+              {intelligence && intelligence.routeConfidence < 0.6 ? (
+                <Badge variant="secondary">Review category</Badge>
+              ) : null}
+            </div>
+            {analysisError ? <p className="mt-2 text-xs text-destructive">{analysisError}</p> : null}
+            {intelligence?.signals.length ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {intelligence.signals.slice(0, 4).map((signal) => (
+                  <Badge key={signal.id} variant="champagne" className="max-w-full truncate">
+                    {signal.label}
+                  </Badge>
+                ))}
+                {intelligence.signals.length > 4 ? (
+                  <Badge variant="outline">+{intelligence.signals.length - 4} more</Badge>
+                ) : null}
+              </div>
+            ) : intelligence && !isAnalyzing ? (
+              <p className="mt-2 text-xs text-muted-foreground">No preference signals extracted from this transcript.</p>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          <Button onClick={save} disabled={walkie.isTranscribing} className="min-h-10 flex-1">
+          <Button onClick={save} disabled={walkie.isTranscribing || isAnalyzing} className="min-h-10 flex-1">
             <Save className="size-4" />
-            {walkie.isTranscribing ? "Transcribing..." : "Save as voice note"}
+            {walkie.isTranscribing ? "Transcribing..." : isAnalyzing ? "Analyzing..." : "Save as voice note"}
           </Button>
           <Button variant="outline" onClick={discard} className="min-h-10">
             <RotateCcw className="size-4" />
@@ -376,4 +511,17 @@ function formatElapsed(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return `${minutes.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`;
+}
+
+function isWalkieIntelligence(value: unknown): value is WalkieIntelligence {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "category" in value &&
+      "priority" in value &&
+      "title" in value &&
+      "routeConfidence" in value &&
+      "signals" in value &&
+      Array.isArray(value.signals)
+  );
 }

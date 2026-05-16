@@ -1,6 +1,8 @@
 import { bumpPriority, CATEGORY_META, getEscalationTarget } from "@/lib/categories";
 import { transcriptTitle } from "@/lib/format";
+import { makeClientId } from "@/lib/id";
 import type {
+  GuestPreference,
   GuestCrmState,
   NewTicketDraft,
   StaffRole,
@@ -9,7 +11,8 @@ import type {
   TicketEvent,
   TicketPriority,
   TicketStatus,
-  UnfiledVoiceNote
+  UnfiledVoiceNote,
+  WalkieIntelligence
 } from "@/lib/types";
 
 export type GuestCrmAction =
@@ -24,12 +27,19 @@ export type GuestCrmAction =
         assignedTo?: StaffRole;
         dueAt?: string;
         voiceNote?: boolean;
+        ticketId?: string;
+        createdEventId?: string;
+        voiceNoteEventId?: string;
+        intelligence?: WalkieIntelligence;
       };
     }
   | { type: "UPDATE_TICKET_STATUS"; payload: { ticketId: string; status: TicketStatus } }
   | { type: "ESCALATE_TICKET"; payload: { ticketId: string; note?: string } }
   | { type: "ADD_TICKET_COMMENT"; payload: { ticketId: string; body: string } }
-  | { type: "ADD_VOICE_NOTE"; payload: { ticketId: string; transcript: string; audioUrl?: string } }
+  | {
+      type: "ADD_VOICE_NOTE";
+      payload: { ticketId: string; transcript: string; audioUrl?: string; eventId?: string; intelligence?: WalkieIntelligence };
+    }
   | { type: "ASSIGN_TICKET"; payload: { ticketId: string; assignedTo: StaffRole } }
   | { type: "SET_PRIORITY"; payload: { ticketId: string; priority: TicketPriority } }
   | { type: "SET_FOCUSED_GUEST"; payload: { guestId?: string } }
@@ -37,8 +47,19 @@ export type GuestCrmAction =
   | { type: "CLOSE_GUEST_DETAIL" }
   | { type: "OPEN_NEW_TICKET"; payload?: NewTicketDraft }
   | { type: "CLOSE_NEW_TICKET" }
-  | { type: "ADD_UNFILED_NOTE"; payload: Omit<UnfiledVoiceNote, "id" | "createdAt"> }
-  | { type: "FILE_UNFILED_NOTE"; payload: { noteId: string; guestId: string; priority?: TicketPriority } }
+  | { type: "ADD_UNFILED_NOTE"; payload: Omit<UnfiledVoiceNote, "id" | "createdAt"> & { noteId?: string } }
+  | {
+      type: "FILE_UNFILED_NOTE";
+      payload: {
+        noteId: string;
+        guestId: string;
+        priority?: TicketPriority;
+        ticketId?: string;
+        createdEventId?: string;
+        voiceNoteEventId?: string;
+        intelligence?: WalkieIntelligence;
+      };
+    }
   | { type: "SET_BACKEND_SYNC"; payload: Partial<GuestCrmState["backend"]> }
   | { type: "REPLACE_STORE"; payload: GuestCrmState };
 
@@ -51,19 +72,45 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function makeId(prefix: string) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
+function makeId(prefix: "t" | "e" | "u" | "pref") {
+  return makeClientId(prefix);
 }
 
-function makeEvent(ticketId: string, event: Omit<TicketEvent, "id" | "ticketId" | "actorId" | "actorName" | "at">): TicketEvent {
+function makeEvent(
+  ticketId: string,
+  event: Omit<TicketEvent, "id" | "ticketId" | "actorId" | "actorName" | "at">,
+  id = makeId("e")
+): TicketEvent {
   return {
-    id: makeId("e"),
+    id,
     ticketId,
     actorId: CURRENT_STAFF.id,
     actorName: CURRENT_STAFF.name,
     at: nowIso(),
     ...event
   };
+}
+
+function makeGuestPreferences(input: {
+  guestId: string;
+  intelligence?: WalkieIntelligence;
+  evidenceIds: string[];
+}): GuestPreference[] {
+  if (!input.intelligence?.signals.length) return [];
+  const now = nowIso();
+  return input.intelligence.signals.map((signal) => ({
+    id: makeId("pref"),
+    guestId: input.guestId,
+    category: signal.preferenceCategory,
+    label: signal.label,
+    detail: signal.detail,
+    confidence: signal.confidence,
+    status: "candidate",
+    sourceType: "voice_note",
+    evidenceIds: input.evidenceIds,
+    createdAt: now,
+    updatedAt: now
+  }));
 }
 
 function updateTicket(state: GuestCrmState, ticketId: string, updater: (ticket: Ticket) => Ticket): GuestCrmState {
@@ -76,16 +123,16 @@ function updateTicket(state: GuestCrmState, ticketId: string, updater: (ticket: 
 export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): GuestCrmState {
   switch (action.type) {
     case "CREATE_TICKET": {
-      const ticketId = makeId("t");
+      const ticketId = action.payload.ticketId ?? makeId("t");
       const createdEvent = makeEvent(ticketId, {
         type: "created",
         body: action.payload.detail
-      });
+      }, action.payload.createdEventId);
       const voiceEvent = action.payload.voiceNote
         ? makeEvent(ticketId, {
             type: "voice_note",
             body: action.payload.detail
-          })
+          }, action.payload.voiceNoteEventId)
         : undefined;
       const ticket: Ticket = {
         id: ticketId,
@@ -102,7 +149,18 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         dueAt: action.payload.dueAt,
         events: voiceEvent ? [createdEvent, voiceEvent] : [createdEvent]
       };
-      return { ...state, tickets: [ticket, ...state.tickets], newTicketOpen: false, newTicketDraft: undefined };
+      const preferences = makeGuestPreferences({
+        guestId: action.payload.guestId,
+        intelligence: action.payload.intelligence,
+        evidenceIds: [voiceEvent?.id ?? createdEvent.id]
+      });
+      return {
+        ...state,
+        tickets: [ticket, ...state.tickets],
+        preferences: [...preferences, ...state.preferences],
+        newTicketOpen: false,
+        newTicketDraft: undefined
+      };
     }
     case "UPDATE_TICKET_STATUS":
       return updateTicket(state, action.payload.ticketId, (ticket) => ({
@@ -149,19 +207,31 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
           })
         ]
       }));
-    case "ADD_VOICE_NOTE":
-      return updateTicket(state, action.payload.ticketId, (ticket) => ({
-        ...ticket,
-        updatedAt: nowIso(),
-        events: [
-          ...ticket.events,
-          makeEvent(ticket.id, {
+    case "ADD_VOICE_NOTE": {
+      let preferences: GuestPreference[] = [];
+      const nextState = updateTicket(state, action.payload.ticketId, (ticket) => {
+        const event = makeEvent(
+          ticket.id,
+          {
             type: "voice_note",
             body: action.payload.transcript,
             audioUrl: action.payload.audioUrl
-          })
-        ]
-      }));
+          },
+          action.payload.eventId
+        );
+        preferences = makeGuestPreferences({
+          guestId: ticket.guestId,
+          intelligence: action.payload.intelligence,
+          evidenceIds: [event.id]
+        });
+        return {
+          ...ticket,
+          updatedAt: nowIso(),
+          events: [...ticket.events, event]
+        };
+      });
+      return preferences.length > 0 ? { ...nextState, preferences: [...preferences, ...nextState.preferences] } : nextState;
+    }
     case "ASSIGN_TICKET":
       return updateTicket(state, action.payload.ticketId, (ticket) => ({
         ...ticket,
@@ -201,7 +271,7 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         ...state,
         unfiledNotes: [
           {
-            id: makeId("u"),
+            id: action.payload.noteId ?? makeId("u"),
             createdAt: nowIso(),
             ...action.payload
           },
@@ -211,7 +281,23 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
     case "FILE_UNFILED_NOTE": {
       const note = state.unfiledNotes.find((item) => item.id === action.payload.noteId);
       if (!note) return state;
-      const ticketId = makeId("t");
+      const ticketId = action.payload.ticketId ?? makeId("t");
+      const createdEvent = makeEvent(
+        ticketId,
+        {
+          type: "created",
+          body: note.transcript
+        },
+        action.payload.createdEventId
+      );
+      const voiceEvent = makeEvent(
+        ticketId,
+        {
+          type: "voice_note",
+          body: note.transcript
+        },
+        action.payload.voiceNoteEventId
+      );
       const ticket: Ticket = {
         id: ticketId,
         guestId: action.payload.guestId,
@@ -224,20 +310,17 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         updatedAt: nowIso(),
         createdBy: CURRENT_STAFF.id,
         assignedTo: CATEGORY_META[note.category].leadRole,
-        events: [
-          makeEvent(ticketId, {
-            type: "created",
-            body: note.transcript
-          }),
-          makeEvent(ticketId, {
-            type: "voice_note",
-            body: note.transcript
-          })
-        ]
+        events: [createdEvent, voiceEvent]
       };
+      const preferences = makeGuestPreferences({
+        guestId: action.payload.guestId,
+        intelligence: action.payload.intelligence ?? note.intelligence,
+        evidenceIds: [voiceEvent.id]
+      });
       return {
         ...state,
         tickets: [ticket, ...state.tickets],
+        preferences: [...preferences, ...state.preferences],
         unfiledNotes: state.unfiledNotes.map((item) =>
           item.id === note.id
             ? {

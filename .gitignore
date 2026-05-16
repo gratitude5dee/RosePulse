@@ -9,3 +9,4 @@ dist/
 pnpm-debug.log*
 tsconfig.tsbuildinfo
 .vercel
+supabase/.temp/

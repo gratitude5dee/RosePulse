@@ -608,3 +608,9 @@ begin
   alter publication supabase_realtime add table public.guest_preferences;
 exception when duplicate_object then null;
 end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.guest_preference_evidence;
+exception when duplicate_object then null;
+end $$;

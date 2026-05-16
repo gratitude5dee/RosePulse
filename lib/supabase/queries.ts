@@ -2,13 +2,15 @@
 
 import { bumpPriority, CATEGORY_META, getEscalationTarget } from "@/lib/categories";
 import { transcriptTitle } from "@/lib/format";
+import { makeClientId } from "@/lib/id";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { ROSEPULSE_PROPERTY_ID } from "@/lib/supabase/config";
 import type { Inserts, Updates } from "@/lib/supabase/database.types";
 import { mapRemoteRowsToState } from "@/lib/supabase/mappers";
 import type { RemoteCrmRows } from "@/lib/supabase/mappers";
 import type { GuestCrmAction } from "@/lib/store/reducer";
-import type { GuestCrmState, StaffRole, TicketEvent, TicketPriority, TicketStatus } from "@/lib/types";
+import { analyzeWalkieTranscript } from "@/lib/walkie-intelligence";
+import type { GuestCrmState, StaffRole, TicketEvent, TicketPriority, TicketStatus, WalkieIntelligence } from "@/lib/types";
 
 const CURRENT_STAFF = {
   id: "s_001",
@@ -77,7 +79,7 @@ export function persistGuestCrmAction(action: GuestCrmAction, state: GuestCrmSta
     case "ADD_TICKET_COMMENT":
       return addTicketComment(action.payload.ticketId, action.payload.body);
     case "ADD_VOICE_NOTE":
-      return addVoiceNote(action.payload.ticketId, action.payload.transcript, action.payload.audioUrl);
+      return addVoiceNote(action.payload.ticketId, action.payload.transcript, action.payload.audioUrl, action.payload.eventId, action.payload.intelligence, state);
     case "ASSIGN_TICKET":
       return assignTicket(action.payload.ticketId, action.payload.assignedTo);
     case "SET_PRIORITY":
@@ -85,14 +87,14 @@ export function persistGuestCrmAction(action: GuestCrmAction, state: GuestCrmSta
     case "ADD_UNFILED_NOTE":
       return addUnfiledNote(action.payload);
     case "FILE_UNFILED_NOTE":
-      return fileUnfiledNote(action.payload.noteId, action.payload.guestId, action.payload.priority, state);
+      return fileUnfiledNote(action.payload, state);
     default:
       return undefined;
   }
 }
 
 async function createTicket(payload: Extract<GuestCrmAction, { type: "CREATE_TICKET" }>["payload"]) {
-  const ticketId = makeId("t");
+  const ticketId = payload.ticketId ?? makeId("t");
   const ticket: Inserts<"tickets"> = {
     id: ticketId,
     property_id: ROSEPULSE_PROPERTY_ID,
@@ -108,18 +110,27 @@ async function createTicket(payload: Extract<GuestCrmAction, { type: "CREATE_TIC
   };
 
   await insertTicket(ticket);
-  await insertEvent({
+  const createdEventId = await insertEvent({
+    eventId: payload.createdEventId,
     ticketId,
     type: "created",
     body: payload.detail
   });
+  let voiceNoteEventId: string | undefined;
   if (payload.voiceNote) {
-    await insertEvent({
+    voiceNoteEventId = await insertEvent({
+      eventId: payload.voiceNoteEventId,
       ticketId,
       type: "voice_note",
       body: payload.detail
     });
   }
+  await persistPreferenceCandidates({
+    guestId: payload.guestId,
+    ticketId,
+    ticketEventId: voiceNoteEventId ?? createdEventId,
+    intelligence: payload.intelligence
+  });
 }
 
 async function updateTicketStatus(ticketId: string, status: TicketStatus, state: GuestCrmState) {
@@ -161,14 +172,31 @@ async function addTicketComment(ticketId: string, body: string) {
   });
 }
 
-async function addVoiceNote(ticketId: string, transcript: string, audioUrl?: string) {
+async function addVoiceNote(
+  ticketId: string,
+  transcript: string,
+  audioUrl: string | undefined,
+  eventId: string | undefined,
+  intelligence: WalkieIntelligence | undefined,
+  state: GuestCrmState
+) {
+  const ticket = state.tickets.find((item) => item.id === ticketId);
   await updateTicket(ticketId, { updated_at: nowIso() });
-  await insertEvent({
+  const ticketEventId = await insertEvent({
+    eventId,
     ticketId,
     type: "voice_note",
     body: transcript,
     audioUrl
   });
+  if (ticket) {
+    await persistPreferenceCandidates({
+      guestId: ticket.guestId,
+      ticketId,
+      ticketEventId,
+      intelligence
+    });
+  }
 }
 
 async function assignTicket(ticketId: string, assignedTo: StaffRole) {
@@ -192,7 +220,7 @@ async function setPriority(ticketId: string, priority: TicketPriority) {
 
 async function addUnfiledNote(payload: Extract<GuestCrmAction, { type: "ADD_UNFILED_NOTE" }>["payload"]) {
   await insertUnfiledNote({
-    id: makeId("u"),
+    id: payload.noteId ?? makeId("u"),
     property_id: ROSEPULSE_PROPERTY_ID,
     transcript: payload.transcript,
     category: payload.category,
@@ -203,31 +231,46 @@ async function addUnfiledNote(payload: Extract<GuestCrmAction, { type: "ADD_UNFI
   });
 }
 
-async function fileUnfiledNote(noteId: string, guestId: string, priority: TicketPriority | undefined, state: GuestCrmState) {
-  const note = state.unfiledNotes.find((item) => item.id === noteId);
+async function fileUnfiledNote(
+  payload: Extract<GuestCrmAction, { type: "FILE_UNFILED_NOTE" }>["payload"],
+  state: GuestCrmState
+) {
+  const note = state.unfiledNotes.find((item) => item.id === payload.noteId);
   if (!note) throw new Error("Unfiled note not found");
 
-  const ticketId = makeId("t");
+  const ticketId = payload.ticketId ?? makeId("t");
   await insertTicket({
     id: ticketId,
     property_id: ROSEPULSE_PROPERTY_ID,
-    guest_id: guestId,
+    guest_id: payload.guestId,
     category: note.category,
     title: transcriptTitle(note.transcript),
     detail: note.transcript,
-    priority: priority ?? note.priority,
+    priority: payload.priority ?? note.priority,
     status: "open",
     created_by: CURRENT_STAFF.id,
     assigned_to_role: CATEGORY_META[note.category].leadRole
   });
-  await insertEvent({ ticketId, type: "created", body: note.transcript });
-  await insertEvent({ ticketId, type: "voice_note", body: note.transcript });
+  await insertEvent({ eventId: payload.createdEventId, ticketId, type: "created", body: note.transcript });
+  const ticketEventId = await insertEvent({ eventId: payload.voiceNoteEventId, ticketId, type: "voice_note", body: note.transcript });
+  await persistPreferenceCandidates({
+    guestId: payload.guestId,
+    ticketId,
+    ticketEventId,
+    intelligence:
+      payload.intelligence ??
+      note.intelligence ??
+      analyzeWalkieTranscript({
+        transcript: note.transcript,
+        guestId: payload.guestId
+      })
+  });
 
   const supabase = getBrowserSupabase();
   const { error } = await supabase
     .from("unfiled_voice_notes")
-    .update({ guest_id: guestId, ticket_id: ticketId, filed_by: CURRENT_STAFF.id, filed_at: nowIso() })
-    .eq("id", noteId)
+    .update({ guest_id: payload.guestId, ticket_id: ticketId, filed_by: CURRENT_STAFF.id, filed_at: nowIso() })
+    .eq("id", payload.noteId)
     .eq("property_id", ROSEPULSE_PROPERTY_ID);
   if (error) throw error;
 }
@@ -243,6 +286,7 @@ async function updateTicket(ticketId: string, patch: Updates<"tickets">) {
 }
 
 async function insertEvent(input: {
+  eventId?: string;
   ticketId: string;
   type: TicketEvent["type"];
   body?: string;
@@ -251,8 +295,9 @@ async function insertEvent(input: {
   toStatus?: TicketStatus;
   escalatedTo?: StaffRole;
 }) {
+  const eventId = input.eventId ?? makeId("e");
   await insertTicketEvent({
-    id: makeId("e"),
+    id: eventId,
     property_id: ROSEPULSE_PROPERTY_ID,
     ticket_id: input.ticketId,
     type: input.type,
@@ -264,6 +309,7 @@ async function insertEvent(input: {
     to_status: input.toStatus ?? null,
     escalated_to: input.escalatedTo ?? null
   });
+  return eventId;
 }
 
 async function insertTicket(row: Inserts<"tickets">) {
@@ -284,10 +330,50 @@ async function insertUnfiledNote(row: Inserts<"unfiled_voice_notes">) {
   if (error) throw error;
 }
 
+async function persistPreferenceCandidates(input: {
+  guestId: string;
+  ticketId: string;
+  ticketEventId: string;
+  intelligence?: WalkieIntelligence;
+}) {
+  if (!input.intelligence?.signals.length) return;
+
+  const supabase = getBrowserSupabase();
+  for (const signal of input.intelligence.signals) {
+    const preferenceId = makeId("pref");
+    const preference: Inserts<"guest_preferences"> = {
+      id: preferenceId,
+      property_id: ROSEPULSE_PROPERTY_ID,
+      guest_id: input.guestId,
+      category: signal.preferenceCategory,
+      label: signal.label,
+      detail: signal.detail,
+      confidence: signal.confidence,
+      status: "candidate",
+      source_type: "voice_note"
+    };
+    const { error: preferenceError } = await supabase.from("guest_preferences").insert(preference);
+    if (preferenceError) throw preferenceError;
+
+    const evidence: Inserts<"guest_preference_evidence"> = {
+      id: makeId("pe"),
+      property_id: ROSEPULSE_PROPERTY_ID,
+      preference_id: preferenceId,
+      ticket_id: input.ticketId,
+      ticket_event_id: input.ticketEventId,
+      guest_note_id: null,
+      unfiled_voice_note_id: null,
+      quote: signal.evidence
+    };
+    const { error: evidenceError } = await supabase.from("guest_preference_evidence").insert(evidence);
+    if (evidenceError) throw evidenceError;
+  }
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
 
-function makeId(prefix: "t" | "e" | "u") {
-  return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
+function makeId(prefix: "t" | "e" | "u" | "pref" | "pe") {
+  return makeClientId(prefix);
 }
