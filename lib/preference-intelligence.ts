@@ -2,12 +2,14 @@ import type { Guest, GuestPreference, PreferenceCategory, PreferenceRecommendati
 
 const TAG_CATEGORY_PATTERNS: Array<{ category: PreferenceCategory; pattern: RegExp }> = [
   { category: "dining", pattern: /allergy|dining|halal|kosher|vegetarian|breakfast|coffee|tea|champagne|wine|chef/i },
-  { category: "room", pattern: /floor|pillow|mattress|room|connecting|quiet|towel|robe|water|espresso/i },
-  { category: "wellness", pattern: /spa|massage|hammam|pool|yoga|sauna|treatment/i },
+  { category: "room", pattern: /floor|pillow|mattress|room|connecting|quiet|towel|robe|water|espresso|design|lighting|villa/i },
+  { category: "wellness", pattern: /spa|massage|hammam|pool|yoga|sauna|treatment|wellness|nature/i },
   { category: "service", pattern: /check-in|checkout|invoice|transfer|assistant|protocol|arrival|privacy/i },
   { category: "security", pattern: /security|discreet|press|paparazzi|side entrance|safety/i },
   { category: "occasion", pattern: /anniversary|birthday|honeymoon|cake|flowers|celebration/i }
 ];
+
+const FULL_PROFILE_PREFERENCE_GUEST_IDS = new Set(["guest_radha_arora_demo"]);
 
 export function inferPreferenceCategory(text: string): PreferenceCategory {
   return TAG_CATEGORY_PATTERNS.find(({ pattern }) => pattern.test(text))?.category ?? "service";
@@ -21,8 +23,12 @@ export function createFixturePreferences(guests: Guest[], tickets: Ticket[]): Gu
   }
 
   return guests.flatMap((guest) =>
-    guest.tags.slice(0, 3).map((tag, index) => {
+    guest.tags.slice(0, FULL_PROFILE_PREFERENCE_GUEST_IDS.has(guest.id) ? 5 : 3).map((tag, index) => {
       const evidence = ticketEvidenceByGuest.get(guest.id) ?? [];
+      const evidenceIds =
+        guest.id === "guest_radha_arora_demo"
+          ? [`t_radha_${String(index + 1).padStart(3, "0")}_e_created`]
+          : evidence.slice(0, 2);
       const now = new Date(Date.now() - (index + 1) * 36 * 60 * 60 * 1000).toISOString();
       return {
         id: `pref_${guest.id}_${index + 1}`,
@@ -33,7 +39,15 @@ export function createFixturePreferences(guests: Guest[], tickets: Ticket[]): Gu
         confidence: 0.72 + index * 0.05,
         status: index === 0 ? "confirmed" : "candidate",
         sourceType: "tag",
-        evidenceIds: evidence.slice(0, 2),
+        privacySensitivity: /privacy|discreet|security|assistant/i.test(tag) ? "medium" : "low",
+        normalizedSignalKey: [guest.id, inferPreferenceCategory(tag), tag, preferenceDetail(tag)]
+          .join("|")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim(),
+        analysisVersion: "fixture-v1",
+        lastSeenAt: now,
+        evidenceIds,
         createdAt: now,
         updatedAt: now
       } satisfies GuestPreference;
@@ -47,6 +61,18 @@ export function createFixtureRecommendations(guests: Guest[], preferences: Guest
     .slice(0, 10)
     .map((guest, index) => {
       const preference = preferences.find((item) => item.guestId === guest.id);
+      if (guest.id === "guest_radha_arora_demo") {
+        return {
+          id: `rec_${guest.id}`,
+          guestId: guest.id,
+          title: "Personalize the Sand Hill sense-of-place briefing",
+          rationale:
+            "Use the sense of place, local design, dining, wellness, and discreet-service signals before the next staff touchpoint.",
+          confidence: 0.9,
+          status: "pending",
+          createdAt: new Date(Date.now() - (index + 1) * 20 * 60 * 1000).toISOString()
+        } satisfies PreferenceRecommendation;
+      }
       return {
         id: `rec_${guest.id}`,
         guestId: guest.id,

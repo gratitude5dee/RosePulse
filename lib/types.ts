@@ -40,6 +40,7 @@ export interface Guest {
 }
 
 export type TicketCategory = "guest_relations" | "room" | "housekeeping" | "security" | "fnb" | "spa";
+export type CategoryFocus = TicketCategory | "all";
 
 export type TicketPriority = "low" | "medium" | "high" | "urgent";
 
@@ -107,6 +108,12 @@ export type VoiceNoteMemoStatus = "unfiled" | "filed" | "attached" | "archived";
 
 export type VoiceNoteMemoSource = "unfiled" | "new_ticket" | "ticket_attachment" | "filed_unfiled";
 
+export type WalkieAnalysisProvider = "deterministic" | "openai";
+
+export type VoiceMemoAnalysisStatus = "pending" | "analyzed" | "failed";
+
+export type GuestSignalPrivacySensitivity = "low" | "medium" | "high";
+
 export interface VoiceNoteMemo {
   id: string;
   transcript: string;
@@ -120,6 +127,14 @@ export interface VoiceNoteMemo {
   preferenceCategories: PreferenceCategory[];
   createdAt: string;
   updatedAt: string;
+  analysisProvider: WalkieAnalysisProvider;
+  analysisModel?: string;
+  analysisVersion: string;
+  analysisStatus: VoiceMemoAnalysisStatus;
+  analysisError?: string;
+  transcriptionModel?: string;
+  durationSeconds?: number;
+  transcribedAt?: string;
   guestId?: string;
   ticketId?: string;
   ticketEventId?: string;
@@ -128,6 +143,17 @@ export interface VoiceNoteMemo {
   filedAt?: string;
   archivedAt?: string;
   intelligence?: WalkieIntelligence;
+}
+
+export interface VoiceMemoMetadata {
+  analysisProvider?: WalkieAnalysisProvider;
+  analysisModel?: string;
+  analysisVersion?: string;
+  analysisStatus?: VoiceMemoAnalysisStatus;
+  analysisError?: string;
+  transcriptionModel?: string;
+  durationSeconds?: number;
+  transcribedAt?: string;
 }
 
 export interface NewTicketDraft {
@@ -167,9 +193,31 @@ export interface GuestPreference {
   confidence: number;
   status: PreferenceStatus;
   sourceType: PreferenceSourceType;
+  privacySensitivity: GuestSignalPrivacySensitivity;
+  normalizedSignalKey?: string;
+  analysisVersion?: string;
+  lastSeenAt?: string;
   evidenceIds: string[];
   createdAt: string;
   updatedAt: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  reviewNote?: string;
+}
+
+export interface GuestPreferenceEvidence {
+  id: string;
+  preferenceId: string;
+  ticketId?: string;
+  ticketEventId?: string;
+  guestNoteId?: string;
+  unfiledVoiceNoteId?: string;
+  voiceNoteMemoId?: string;
+  quote?: string;
+  confidence?: number;
+  privacySensitivity?: GuestSignalPrivacySensitivity;
+  analysisVersion?: string;
+  createdAt: string;
 }
 
 export interface PreferenceRecommendation {
@@ -187,7 +235,9 @@ export interface GuestCrmState {
   tickets: Ticket[];
   staff: Staff[];
   preferences: GuestPreference[];
+  preferenceEvidence: GuestPreferenceEvidence[];
   recommendations: PreferenceRecommendation[];
+  categoryFocus: CategoryFocus;
   focusedGuestId?: string;
   detailGuestId?: string;
   focusedTicketId?: string;
@@ -205,6 +255,7 @@ export type IntakeSourceType =
   | "vip_call"
   | "staff_note"
   | "past_stay"
+  | "public_profile"
   | "feedback_survey"
   | "voice_note";
 
@@ -215,6 +266,11 @@ export interface WalkiePreferenceSignal extends GuestSignal {
 }
 
 export interface WalkieIntelligence {
+  schemaVersion: string;
+  provider: WalkieAnalysisProvider;
+  model?: string;
+  analysisStatus: VoiceMemoAnalysisStatus;
+  analysisError?: string;
   category: TicketCategory;
   priority: TicketPriority;
   title: string;
@@ -242,9 +298,6 @@ export interface IntakeRecord {
   rawText: string;
   capturedAt: string;
 }
-
-/** How sensitive this signal is if surfaced outside the core guest team. */
-export type GuestSignalPrivacySensitivity = "low" | "medium" | "high";
 
 /** Structured preference or fact inferred from intake (no department actions). */
 export interface GuestSignal {

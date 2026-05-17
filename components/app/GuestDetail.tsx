@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { PreferencePanel } from "@/components/app/PreferencePanel";
 import { TicketAccordion } from "@/components/app/TicketAccordion";
 import { TicketRow } from "@/components/app/TicketRow";
+import { useWalkieUi } from "@/components/app/WalkieUiContext";
 import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/categories";
 import {
   formatAge,
@@ -27,9 +28,11 @@ import { getGuestVisualAsset } from "@/lib/visual-assets";
 
 export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode?: "route" | "drawer" }) {
   const { state, dispatch } = useGuestCrm();
+  const { openWalkie } = useWalkieUi();
   const guest = selectGuestById(state, guestId);
   const tickets = selectTicketsByGuest(state, guestId);
   const voiceMemos = selectVoiceMemosByGuest(state, guestId);
+  const focusedCategory = state.categoryFocus === "all" ? undefined : state.categoryFocus;
 
   if (!guest) {
     return <EmptyState title="Guest not found" body="This guest is not in the current Rosewood roster." />;
@@ -47,9 +50,9 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
   }
 
   return (
-    <div className={cn("mx-auto w-full max-w-5xl", mode === "drawer" ? "pb-8" : "px-safe py-6 md:px-8")}>
+    <div className={cn("mx-auto w-full max-w-5xl", mode === "drawer" ? "pb-8" : "px-safe py-4 md:px-8 md:py-6")}>
       <section className="overflow-hidden rounded-lg border bg-background/72 shadow-sm">
-        <div className="relative h-36 sm:h-44">
+        <div className="relative h-28 sm:h-44">
           <Image
             src={visual.src}
             alt={visual.alt}
@@ -59,11 +62,13 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,oklch(0.18_0.015_60/0.28))]" />
         </div>
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
-          <GuestAvatar guest={guest} className="size-16" />
+        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:p-5">
+          <GuestAvatar guest={guest} className="size-14 sm:size-16" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="display-2">{guestDisplayName(guest)}</h1>
+              <h1 className="font-serif text-3xl font-medium leading-9 tracking-normal sm:text-[1.75rem] sm:leading-[2.125rem]">
+                {guestDisplayName(guest)}
+              </h1>
               {guest.vip ? <Badge variant="champagne">VIP</Badge> : null}
               <Badge variant="secondary">{guest.loyaltyTier}</Badge>
               <Badge variant="outline">{formatGuestStatus(guest.status)}</Badge>
@@ -78,8 +83,15 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
               {guest.roomNumber ? `Room ${guest.roomNumber}` : "Room pending"} · {guest.roomType}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button className="min-h-10" variant="secondary" onClick={() => dispatch({ type: "SET_FOCUSED_GUEST", payload: { guestId: guest.id } })}>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Button
+              className="min-h-10"
+              variant="secondary"
+              onClick={() => {
+                dispatch({ type: "SET_FOCUSED_GUEST", payload: { guestId: guest.id } });
+                openWalkie({ guestId: guest.id });
+              }}
+            >
               Talk to file
             </Button>
             <Button className="min-h-10" onClick={() => dispatch({ type: "OPEN_NEW_TICKET", payload: { guestId: guest.id } })}>New ticket</Button>
@@ -88,11 +100,11 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
       </section>
 
       <Tabs defaultValue="overview" className="mt-5">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="tickets">Tickets</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+        <TabsList className="h-auto w-full justify-start overflow-x-auto p-1">
+          <TabsTrigger value="overview" className="min-h-10 shrink-0 px-4">Overview</TabsTrigger>
+          <TabsTrigger value="tickets" className="min-h-10 shrink-0 px-4">Tickets</TabsTrigger>
+          <TabsTrigger value="preferences" className="min-h-10 shrink-0 px-4">Preferences</TabsTrigger>
+          <TabsTrigger value="activity" className="min-h-10 shrink-0 px-4">Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -146,7 +158,13 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
                 const meta = CATEGORY_META[category];
                 const Icon = meta.Icon;
                 return (
-                  <section key={category}>
+                  <section
+                    key={category}
+                    className={cn(
+                      "rounded-md transition-all",
+                      focusedCategory === category && "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                    )}
+                  >
                     <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
                       <Icon className="size-4" style={{ color: `var(${meta.colorVar})` }} />
                       {meta.label}
@@ -172,7 +190,13 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
             <h2 className="display-3">Activity</h2>
             <div className="mt-4 space-y-3">
               {voiceMemos.map((memo) => (
-                <div key={memo.id} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border bg-secondary/30 p-3 text-sm">
+                <div
+                  key={memo.id}
+                  className={cn(
+                    "grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border bg-secondary/30 p-3 text-sm",
+                    focusedCategory === memo.category && "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                  )}
+                >
                   <div className="font-mono text-xs text-muted-foreground">{formatAge(memo.createdAt)}</div>
                   <div>
                     <p className="flex flex-wrap items-center gap-2 font-medium">
@@ -188,7 +212,13 @@ export function GuestDetail({ guestId, mode = "route" }: { guestId: string; mode
                 </div>
               ))}
               {events.map((event) => (
-                <div key={event.id} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border bg-secondary/30 p-3 text-sm">
+                <div
+                  key={event.id}
+                  className={cn(
+                    "grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-md border bg-secondary/30 p-3 text-sm",
+                    focusedCategory === event.ticket.category && "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                  )}
+                >
                   <div className="font-mono text-xs text-muted-foreground">{formatAge(event.at)}</div>
                   <div>
                     <p className="font-medium">

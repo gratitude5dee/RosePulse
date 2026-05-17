@@ -1,14 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
-import { Radio } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PanelRightClose, PanelRightOpen, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/app/Sidebar";
 import { TopBar } from "@/components/app/TopBar";
 import { GuestDetail } from "@/components/app/GuestDetail";
 import { CinematicIntro } from "@/components/app/CinematicIntro";
+import { CategoryOperationsDock } from "@/components/app/CategoryOperationsDock";
+import { WalkieUiProvider, type WalkieOpenTarget } from "@/components/app/WalkieUiContext";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useGuestCrm } from "@/lib/store/store-context";
 import { cn } from "@/lib/utils";
@@ -31,9 +33,11 @@ const NewTicketDialog = dynamic(
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { state, dispatch } = useGuestCrm();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(true);
   const [commandOpen, setCommandOpen] = useState(false);
   const [mobileWalkieOpen, setMobileWalkieOpen] = useState(false);
+  const [walkieTarget, setWalkieTarget] = useState<WalkieOpenTarget | undefined>();
 
   useHotkeys({
     onCommandK: () => setCommandOpen(true),
@@ -51,50 +55,97 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => media.removeEventListener("change", sync);
   }, []);
 
+  const openWalkie = useCallback((target?: WalkieOpenTarget) => {
+    setWalkieTarget(target ? { ...target } : {});
+    if (target?.guestId) {
+      dispatch({ type: "SET_FOCUSED_GUEST", payload: { guestId: target.guestId } });
+    }
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      setRailCollapsed(false);
+      setMobileWalkieOpen(false);
+    } else {
+      setMobileWalkieOpen(true);
+    }
+  }, [dispatch]);
+
+  const walkieUi = useMemo(
+    () => ({
+      target: walkieTarget,
+      openWalkie,
+      closeMobileWalkie: () => setMobileWalkieOpen(false),
+      expandDesktopRail: () => setRailCollapsed(false)
+    }),
+    [openWalkie, walkieTarget]
+  );
+
   return (
-    <div
-      className={cn(
-        "relative z-10 min-h-dvh",
-        "grid grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]",
-        railCollapsed ? "lg:grid-cols-[260px_minmax(0,1fr)_64px]" : "lg:grid-cols-[260px_minmax(0,1fr)_380px]"
-      )}
-    >
+    <WalkieUiProvider value={walkieUi}>
+      <div
+        className={cn(
+          "relative z-10 grid min-h-dvh grid-cols-1 transition-[grid-template-columns] duration-300 ease-out",
+          sidebarCollapsed ? "md:grid-cols-[76px_minmax(0,1fr)]" : "md:grid-cols-[260px_minmax(0,1fr)]",
+          sidebarCollapsed && railCollapsed && "lg:grid-cols-[76px_minmax(0,1fr)_64px]",
+          sidebarCollapsed && !railCollapsed && "lg:grid-cols-[76px_minmax(0,1fr)_380px]",
+          !sidebarCollapsed && railCollapsed && "lg:grid-cols-[260px_minmax(0,1fr)_64px]",
+          !sidebarCollapsed && !railCollapsed && "lg:grid-cols-[260px_minmax(0,1fr)_380px]"
+        )}
+      >
       <div className="sticky top-0 hidden h-dvh border-r bg-background/64 pt-safe backdrop-blur-xl md:block">
-        <Sidebar />
+        <Sidebar collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((current) => !current)} />
       </div>
 
       <div className="min-w-0">
         <TopBar
           onMenu={() => setMobileNavOpen(true)}
           onSearch={() => setCommandOpen(true)}
-          railCollapsed={railCollapsed}
-          onToggleRail={() => setRailCollapsed((current) => !current)}
         />
-        <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-28 lg:pb-6">{children}</main>
+        <div className="sticky top-[calc(4rem+var(--safe-top))] z-20 flex items-center gap-2 border-b bg-background/78 px-safe py-2 backdrop-blur-xl md:hidden">
+          <CategoryOperationsDock />
+          <button
+            type="button"
+            onClick={() => openWalkie()}
+            aria-label="Open walkie talkie"
+            className="flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm"
+          >
+            <Radio className="size-4" />
+            Walkie
+          </button>
+        </div>
+        <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-[max(2rem,var(--safe-bottom))] md:pb-8">{children}</main>
       </div>
 
-      <aside className="sticky top-0 hidden h-dvh border-l bg-background/40 p-3 pt-[max(var(--safe-top),0.75rem)] backdrop-blur-xl lg:block">
+      <aside className="sticky top-0 hidden h-dvh border-l bg-background/40 p-2 pt-[max(var(--safe-top),0.75rem)] backdrop-blur-xl lg:block">
         {railCollapsed ? (
-          <div className="flex h-full flex-col items-center gap-3 pt-16">
-            <Button variant="accent" size="icon" onClick={() => setRailCollapsed(false)} aria-label="Expand walkie rail">
-              <Radio className="size-5" />
+          <div className="flex h-full flex-col items-center justify-between py-3">
+            <div className="flex flex-col items-center gap-4 pt-14">
+              <button
+                type="button"
+                onClick={() => setRailCollapsed(false)}
+                aria-label="Expand walkie rail"
+                className="relative flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5"
+              >
+                <Radio className="size-5" />
+                <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border border-background bg-accent" />
+              </button>
+              <span className="rotate-90 whitespace-nowrap text-xs font-semibold tracking-[0.14em] text-muted-foreground">Walkie</span>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => setRailCollapsed(false)} aria-label="Expand walkie rail">
+              <PanelRightOpen className="size-4" />
             </Button>
-            <span className="rotate-90 whitespace-nowrap text-xs font-medium text-muted-foreground">Walkie</span>
           </div>
         ) : (
-          <WalkiePanel variant="docked" />
+          <div className="h-full animate-in fade-in-0 slide-in-from-right-2 duration-300">
+            <div className="mb-2 flex justify-end">
+              <Button variant="ghost" size="icon" onClick={() => setRailCollapsed(true)} aria-label="Collapse walkie rail">
+                <PanelRightClose className="size-4" />
+              </Button>
+            </div>
+            <div className="h-[calc(100dvh-max(var(--safe-top),0.75rem)-3.5rem)]">
+              <WalkiePanel variant="docked" />
+            </div>
+          </div>
         )}
       </aside>
-
-      <button
-        type="button"
-        onClick={() => setMobileWalkieOpen(true)}
-        aria-label="Open walkie talkie"
-        className="fixed bottom-safe left-1/2 z-40 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground shadow-xl lg:hidden"
-      >
-        <Radio className="size-4" />
-        Walkie
-      </button>
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <SheetContent side="left" className="w-[min(300px,88vw)] p-0 pb-safe pt-safe">
@@ -107,7 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <Sheet open={mobileWalkieOpen} onOpenChange={setMobileWalkieOpen}>
-        <SheetContent side="bottom" className="max-h-[calc(100dvh-var(--safe-top))] overflow-y-auto p-3 pb-[max(var(--safe-bottom),0.75rem)]">
+        <SheetContent side="bottom" className="h-[calc(100dvh-var(--safe-top)-0.75rem)] max-h-[860px] overflow-hidden rounded-t-xl p-3 pb-[max(var(--safe-bottom),0.75rem)]">
           <SheetHeader className="sr-only">
             <SheetTitle>Walkie-Talkie</SheetTitle>
             <SheetDescription>Push-to-talk guest filing panel</SheetDescription>
@@ -129,6 +180,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
       <NewTicketDialog />
       <CinematicIntro />
-    </div>
+      </div>
+    </WalkieUiProvider>
   );
 }

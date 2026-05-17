@@ -8,7 +8,9 @@ const baseState: GuestCrmState = {
   tickets: [],
   staff: [],
   preferences: [],
+  preferenceEvidence: [],
   recommendations: [],
+  categoryFocus: "all",
   focusedGuestId: undefined,
   detailGuestId: undefined,
   focusedTicketId: undefined,
@@ -24,6 +26,16 @@ const baseState: GuestCrmState = {
 };
 
 describe("guestCrmReducer walkie intelligence", () => {
+  it("keeps category focus as UI-only reducer state", () => {
+    const next = guestCrmReducer(baseState, {
+      type: "SET_CATEGORY_FOCUS",
+      payload: { category: "fnb" }
+    });
+
+    expect(next.categoryFocus).toBe("fnb");
+    expect(next.tickets).toHaveLength(0);
+  });
+
   it("creates voice tickets with stable ids and evidence-backed preference candidates", () => {
     const transcript = "Guest has a shellfish allergy for dinner tonight and asked chef to avoid dairy.";
     const intelligence = analyzeWalkieTranscript({ transcript, guestId: "g_1" });
@@ -51,6 +63,7 @@ describe("guestCrmReducer walkie intelligence", () => {
     expect(next.preferences[0]?.sourceType).toBe("voice_note");
     expect(next.preferences[0]?.evidenceIds).toContain("e_voice");
     expect(next.preferences[0]?.evidenceIds).toContain("memo_known");
+    expect(next.preferenceEvidence.some((evidence) => evidence.voiceNoteMemoId === "memo_known")).toBe(true);
     expect(next.voiceMemos[0]).toMatchObject({
       id: "memo_known",
       status: "filed",
@@ -92,6 +105,7 @@ describe("guestCrmReducer walkie intelligence", () => {
 
     expect(next.tickets[0]?.events[0]?.id).toBe("e_voice_existing");
     expect(next.preferences.some((preference) => preference.evidenceIds.includes("e_voice_existing"))).toBe(true);
+    expect(next.preferenceEvidence.some((evidence) => evidence.ticketEventId === "e_voice_existing")).toBe(true);
     expect(next.voiceMemos[0]).toMatchObject({
       id: "memo_attached",
       status: "attached",
@@ -129,6 +143,7 @@ describe("guestCrmReducer walkie intelligence", () => {
 
     expect(filed.tickets[0]?.id).toBe("t_filed");
     expect(filed.preferences.some((preference) => preference.evidenceIds.includes("e_voice_filed"))).toBe(true);
+    expect(filed.preferenceEvidence.some((evidence) => evidence.voiceNoteMemoId === "memo_unfiled")).toBe(true);
     expect(filed.unfiledNotes[0]?.filedAt).toBeDefined();
     expect(filed.voiceMemos[0]).toMatchObject({
       id: "memo_unfiled",

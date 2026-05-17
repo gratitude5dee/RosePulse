@@ -27,15 +27,15 @@ export function CategoryChip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative inline-flex h-10 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all duration-200 sm:h-8",
+        "relative inline-flex h-9 min-w-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-all duration-200 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-xs",
         count === 0 ? "border-border/70 bg-secondary/40 text-muted-foreground opacity-60" : "border-border bg-background/80 text-foreground shadow-sm hover:-translate-y-0.5",
         active && "ring-2 ring-ring ring-offset-2 ring-offset-background",
         disabled && "cursor-not-allowed"
       )}
     >
       <Icon className="size-3.5" style={{ color: `var(${meta.colorVar})` }} />
-      <span className="max-w-20 truncate">{meta.label}</span>
-      <span className="ml-0.5 rounded-full bg-secondary px-1.5 font-mono text-[11px]">{count}</span>
+      <span className="max-w-[3.8rem] truncate sm:max-w-20">{meta.label}</span>
+      <span className="ml-auto rounded-full bg-secondary px-1.5 font-mono text-[10px] sm:ml-0.5 sm:text-[11px]">{count}</span>
       {priorityPeak ? (
         <span
           aria-hidden

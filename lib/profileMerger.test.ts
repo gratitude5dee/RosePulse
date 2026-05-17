@@ -4,7 +4,12 @@ import { preferenceExtractor } from "@/lib/preferenceExtractor";
 import { mergeEnrichedGuestProfile } from "@/lib/profileMerger";
 import type { GuestSignal } from "@/lib/types";
 
-const eleanorFixture = guestPulseMockGuests[0];
+const eleanorFixture = guestPulseMockGuests.find((row) => row.guest.id === "ing_eleanor");
+
+if (!eleanorFixture) {
+  throw new Error("GuestPulse test fixture: Eleanor fixture missing");
+}
+
 const eleanorStaffNote = eleanorFixture.intakeRecords.find((r) => r.id === "ir_el_staff_01");
 
 if (!eleanorStaffNote) {

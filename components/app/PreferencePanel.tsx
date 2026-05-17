@@ -1,11 +1,12 @@
 "use client";
 
-import { Brain, CheckCircle2, Sparkles } from "lucide-react";
+import { Brain, CheckCircle2, FileAudio2, Sparkles, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/app/EmptyState";
 import { formatAge } from "@/lib/format";
-import { selectPreferencesByGuest, selectRecommendationsByGuest } from "@/lib/store/selectors";
+import { selectPreferenceEvidenceByGuest, selectPreferencesByGuest, selectRecommendationsByGuest } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { PreferenceCategory } from "@/lib/types";
 import { VISUAL_ASSETS } from "@/lib/visual-assets";
@@ -21,10 +22,22 @@ const CATEGORY_LABELS: Record<PreferenceCategory, string> = {
 };
 
 export function PreferencePanel({ guestId }: { guestId: string }) {
-  const { state } = useGuestCrm();
+  const { state, dispatch } = useGuestCrm();
   const preferences = selectPreferencesByGuest(state, guestId);
+  const evidence = selectPreferenceEvidenceByGuest(state, guestId);
   const recommendations = selectRecommendationsByGuest(state, guestId);
   const voiceMemoIds = new Set(state.voiceMemos.filter((memo) => memo.guestId === guestId).map((memo) => memo.id));
+  const evidenceByPreference = new Map(
+    preferences.map((preference) => [
+      preference.id,
+      evidence.filter((item) => item.preferenceId === preference.id)
+    ])
+  );
+
+  function resolvePreference(preferenceId: string, status: "confirmed" | "dismissed") {
+    dispatch({ type: "RESOLVE_GUEST_PREFERENCE", payload: { preferenceId, status } });
+    toast.success(status === "confirmed" ? "Preference confirmed" : "Preference dismissed");
+  }
 
   if (preferences.length === 0 && recommendations.length === 0) {
     return (
@@ -71,6 +84,35 @@ export function PreferencePanel({ guestId }: { guestId: string }) {
                 {preference.evidenceIds.some((id) => voiceMemoIds.has(id)) ? <Badge variant="champagne">Voice memo evidence</Badge> : null}
                 <span>{formatAge(preference.updatedAt)}</span>
               </div>
+              <div className="mt-3 space-y-2">
+                {(evidenceByPreference.get(preference.id) ?? []).slice(0, 2).map((item) => (
+                  <div key={item.id} className="rounded-md border bg-background/60 p-2 text-xs text-muted-foreground">
+                    <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                      {item.voiceNoteMemoId ? (
+                        <Badge variant="outline">
+                          <FileAudio2 className="size-3" />
+                          Voice memo
+                        </Badge>
+                      ) : null}
+                      {item.privacySensitivity ? <Badge variant="secondary">{item.privacySensitivity} sensitivity</Badge> : null}
+                      <span>{formatAge(item.createdAt)}</span>
+                    </div>
+                    <p className="line-clamp-2">{item.quote ?? "Evidence captured from operational activity."}</p>
+                  </div>
+                ))}
+              </div>
+              {preference.status === "candidate" ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" onClick={() => resolvePreference(preference.id, "confirmed")}>
+                    <CheckCircle2 className="size-4" />
+                    Confirm
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => resolvePreference(preference.id, "dismissed")}>
+                    <XCircle className="size-4" />
+                    Dismiss
+                  </Button>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>

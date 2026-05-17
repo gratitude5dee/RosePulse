@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(11);
+select plan(14);
 
 insert into public.properties (id, name, slug)
 values
@@ -67,6 +67,35 @@ select ok(exists(select 1 from public.voice_note_memos where id = 'test_memo_a')
 insert into public.guest_preference_evidence (id, property_id, preference_id, voice_note_memo_id, quote)
 values ('test_evidence_memo_a', 'test_property_a', 'test_pref_a', 'test_memo_a', 'Voice memo evidence');
 select ok(exists(select 1 from public.guest_preference_evidence where voice_note_memo_id = 'test_memo_a'), 'property member can link preference evidence to a voice memo');
+select is(
+  (public.save_walkie_voice_memo(jsonb_build_object(
+    'propertyId', 'test_property_a',
+    'source', 'new_ticket',
+    'status', 'filed',
+    'memoId', 'test_rpc_memo_a',
+    'ticketId', 'test_rpc_ticket_a',
+    'voiceNoteEventId', 'test_rpc_voice_event_a',
+    'guestId', 'test_guest_a',
+    'transcript', 'Guest has a nut allergy for dinner and prefers quiet room placement.',
+    'category', 'fnb',
+    'priority', 'urgent',
+    'routeConfidence', 0.84,
+    'analysisProvider', 'deterministic',
+    'analysisStatus', 'analyzed',
+    'signals', jsonb_build_array(jsonb_build_object(
+      'preferenceCategory', 'dining',
+      'label', 'Allergy & Safety',
+      'detail', 'Nut allergy for dinner service',
+      'value', 'Nut allergy for dinner service',
+      'evidence', 'Guest has a nut allergy for dinner',
+      'confidence', 0.9,
+      'privacySensitivity', 'high'
+    ))
+  ))->>'memoId'),
+  'test_rpc_memo_a',
+  'property member can atomically save a walkie memo'
+);
+select ok(exists(select 1 from public.guest_preference_evidence where voice_note_memo_id = 'test_rpc_memo_a'), 'walkie memo RPC links preference evidence');
 select is((select count(*) from public.guest_preference_evidence where property_id = 'test_property_b'), 0::bigint, 'property member cannot read cross-property preference evidence');
 select is((select count(*) from public.voice_note_memos where property_id = 'test_property_b'), 0::bigint, 'property member cannot read cross-property voice memos');
 update public.guest_preferences
@@ -79,6 +108,11 @@ insert into public.staff_property_memberships (id, staff_id, auth_user_id, prope
 values ('test_manager_created_member', 'test_staff_a', '11111111-1111-4111-8111-111111111111', 'test_property_a', 'concierge', true)
 on conflict (id) do update set active = excluded.active;
 select ok(exists(select 1 from public.staff_property_memberships where id = 'test_manager_created_member'), 'manager can manage memberships');
+select is(
+  (public.resolve_guest_preference('test_pref_a', 'confirmed', 'approved by manager')->>'status'),
+  'confirmed',
+  'manager can resolve preference candidates'
+);
 
 select * from finish();
 

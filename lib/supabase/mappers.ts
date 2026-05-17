@@ -1,6 +1,7 @@
 import type {
   Guest,
   GuestCrmState,
+  GuestPreferenceEvidence,
   GuestPreference,
   PreferenceRecommendation,
   Staff,
@@ -83,6 +84,7 @@ export function mapRemoteRowsToState(rows: RemoteCrmRows, fallback: GuestCrmStat
     staff: rows.staff.map(mapStaff),
     unfiledNotes: rows.unfiledNotes.map(mapUnfiledNote),
     voiceMemos: rows.voiceMemos.map(mapVoiceMemo),
+    preferenceEvidence: rows.preferenceEvidence.map(mapGuestPreferenceEvidence),
     preferences: rows.preferences.map((preference) =>
       mapGuestPreference(
         preference,
@@ -155,6 +157,14 @@ function mapVoiceMemo(memo: Tables<"voice_note_memos">): VoiceNoteMemo {
     preferenceCategories: memo.preference_categories,
     createdAt: memo.created_at,
     updatedAt: memo.updated_at,
+    analysisProvider: memo.analysis_provider ?? "deterministic",
+    analysisModel: memo.analysis_model ?? undefined,
+    analysisVersion: memo.analysis_version ?? "guestpulse-v1",
+    analysisStatus: memo.analysis_status ?? "analyzed",
+    analysisError: memo.analysis_error ?? undefined,
+    transcriptionModel: memo.transcription_model ?? undefined,
+    durationSeconds: memo.duration_seconds ?? undefined,
+    transcribedAt: memo.transcribed_at ?? undefined,
     guestId: memo.guest_id ?? undefined,
     ticketId: memo.ticket_id ?? undefined,
     ticketEventId: memo.ticket_event_id ?? undefined,
@@ -162,7 +172,7 @@ function mapVoiceMemo(memo: Tables<"voice_note_memos">): VoiceNoteMemo {
     createdBy: memo.created_by ?? undefined,
     filedAt: memo.filed_at ?? undefined,
     archivedAt: memo.archived_at ?? undefined,
-    intelligence: isWalkieIntelligence(memo.intelligence) ? memo.intelligence : undefined
+    intelligence: normalizeWalkieIntelligence(memo.intelligence)
   };
 }
 
@@ -176,9 +186,33 @@ function mapGuestPreference(preference: Tables<"guest_preferences">, evidenceIds
     confidence: preference.confidence,
     status: preference.status,
     sourceType: preference.source_type,
+    privacySensitivity: preference.privacy_sensitivity ?? "low",
+    normalizedSignalKey: preference.normalized_signal_key ?? preference.dedupe_key ?? undefined,
+    analysisVersion: preference.analysis_version ?? undefined,
+    lastSeenAt: preference.last_seen_at ?? undefined,
     evidenceIds,
     createdAt: preference.created_at,
-    updatedAt: preference.updated_at
+    updatedAt: preference.updated_at,
+    resolvedBy: preference.resolved_by ?? undefined,
+    resolvedAt: preference.resolved_at ?? undefined,
+    reviewNote: preference.review_note ?? undefined
+  };
+}
+
+function mapGuestPreferenceEvidence(evidence: Tables<"guest_preference_evidence">): GuestPreferenceEvidence {
+  return {
+    id: evidence.id,
+    preferenceId: evidence.preference_id,
+    ticketId: evidence.ticket_id ?? undefined,
+    ticketEventId: evidence.ticket_event_id ?? undefined,
+    guestNoteId: evidence.guest_note_id ?? undefined,
+    unfiledVoiceNoteId: evidence.unfiled_voice_note_id ?? undefined,
+    voiceNoteMemoId: evidence.voice_note_memo_id ?? undefined,
+    quote: evidence.quote ?? undefined,
+    confidence: evidence.confidence ?? undefined,
+    privacySensitivity: evidence.privacy_sensitivity ?? undefined,
+    analysisVersion: evidence.analysis_version ?? undefined,
+    createdAt: evidence.created_at
   };
 }
 
@@ -217,15 +251,31 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string) {
   return map;
 }
 
-function isWalkieIntelligence(value: unknown): value is WalkieIntelligence {
-  return Boolean(
-    value &&
-      typeof value === "object" &&
-      "category" in value &&
-      "priority" in value &&
-      "title" in value &&
-      "routeConfidence" in value &&
-      "signals" in value &&
-      Array.isArray((value as { signals?: unknown }).signals)
-  );
+function normalizeWalkieIntelligence(value: unknown): WalkieIntelligence | undefined {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !("category" in value) ||
+    !("priority" in value) ||
+    !("title" in value) ||
+    !("routeConfidence" in value) ||
+    !("signals" in value) ||
+    !Array.isArray((value as { signals?: unknown }).signals)
+  ) {
+    return undefined;
+  }
+
+  const intelligence = value as Partial<WalkieIntelligence> & Pick<WalkieIntelligence, "category" | "priority" | "title" | "routeConfidence" | "signals">;
+  return {
+    schemaVersion: intelligence.schemaVersion ?? "guestpulse-v1",
+    provider: intelligence.provider ?? "deterministic",
+    model: intelligence.model,
+    analysisStatus: intelligence.analysisStatus ?? "analyzed",
+    analysisError: intelligence.analysisError,
+    category: intelligence.category,
+    priority: intelligence.priority,
+    title: intelligence.title,
+    routeConfidence: intelligence.routeConfidence,
+    signals: intelligence.signals
+  };
 }

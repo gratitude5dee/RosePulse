@@ -5,8 +5,14 @@ import { addDays, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { GuestCard } from "@/components/app/GuestCard";
 import { PropertyMasthead } from "@/components/app/PropertyMasthead";
+import { useWalkieUi } from "@/components/app/WalkieUiContext";
 import { businessToday, formatLongDate } from "@/lib/format";
-import { selectGuestsArrivingWithin, selectTicketsByGuest } from "@/lib/store/selectors";
+import {
+  selectGuestHasCategoryWork,
+  selectGuestsArrivingWithin,
+  selectTicketsByGuest,
+  selectVoiceMemosByGuest
+} from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { Guest, TicketCategory } from "@/lib/types";
 import { VISUAL_ASSETS } from "@/lib/visual-assets";
@@ -14,13 +20,17 @@ import { cn } from "@/lib/utils";
 
 export function ArrivingView() {
   const { state, dispatch } = useGuestCrm();
+  const { openWalkie } = useWalkieUi();
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const categoryFocus = state.categoryFocus;
   const guests = selectGuestsArrivingWithin(state, 14);
   const dateStrip = useMemo(
     () => Array.from({ length: 14 }, (_, index) => format(addDays(businessToday(), index + 1), "yyyy-MM-dd")),
     []
   );
-  const filteredGuests = dateFilter === "all" ? guests : guests.filter((guest) => guest.arrivalDate === dateFilter);
+  const filteredGuests = (dateFilter === "all" ? guests : guests.filter((guest) => guest.arrivalDate === dateFilter)).filter((guest) =>
+    categoryFocus === "all" ? true : selectGuestHasCategoryWork(state, guest.id, categoryFocus)
+  );
   const grouped = useMemo(() => {
     return filteredGuests.reduce<Record<string, Guest[]>>((acc, guest) => {
       acc[guest.arrivalDate] = [...(acc[guest.arrivalDate] ?? []), guest];
@@ -34,6 +44,7 @@ export function ArrivingView() {
 
   function talkToGuest(guest: Guest) {
     dispatch({ type: "SET_FOCUSED_GUEST", payload: { guestId: guest.id } });
+    openWalkie({ guestId: guest.id });
   }
 
   function addTicket(guest: Guest, category?: TicketCategory) {
@@ -41,7 +52,7 @@ export function ArrivingView() {
   }
 
   return (
-    <div className="px-safe py-6 md:px-8">
+    <div className="px-safe py-4 md:px-8 md:py-6">
       <PropertyMasthead
         asset={VISUAL_ASSETS.poolRetreat}
         eyebrow="Arrivals · Next 14 days"
@@ -78,6 +89,8 @@ export function ArrivingView() {
                   key={guest.id}
                   guest={guest}
                   tickets={selectTicketsByGuest(state, guest.id)}
+                  voiceMemos={selectVoiceMemosByGuest(state, guest.id)}
+                  focusedCategory={categoryFocus}
                   onOpen={openGuest}
                   onTalk={talkToGuest}
                   onAddTicket={addTicket}

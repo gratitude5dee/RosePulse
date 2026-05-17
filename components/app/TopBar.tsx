@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Menu, PanelRightClose, PanelRightOpen, Search, UserRound } from "lucide-react";
+import { Bell, Menu, Search, UserRound } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,14 +18,10 @@ import { useGuestCrm } from "@/lib/store/store-context";
 
 export function TopBar({
   onMenu,
-  onSearch,
-  onToggleRail,
-  railCollapsed
+  onSearch
 }: {
   onMenu: () => void;
   onSearch: () => void;
-  onToggleRail: () => void;
-  railCollapsed: boolean;
 }) {
   const { state } = useGuestCrm();
   const syncLabel = state.backend.mode === "supabase" ? (state.backend.status === "synced" ? "Live" : "Syncing") : "Fixture";
@@ -67,9 +63,6 @@ export function TopBar({
       <Button variant="ghost" size="icon" aria-label="Notifications" className="relative hidden min-[390px]:inline-flex">
         <Bell className="size-4" />
         <span className="absolute right-2 top-2 size-2 rounded-full bg-destructive" />
-      </Button>
-      <Button variant="ghost" size="icon" onClick={onToggleRail} aria-label="Toggle walkie rail" className="hidden lg:inline-flex">
-        {railCollapsed ? <PanelRightOpen className="size-4" /> : <PanelRightClose className="size-4" />}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

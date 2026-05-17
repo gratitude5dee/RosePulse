@@ -17,6 +17,7 @@ import { VISUAL_ASSETS } from "@/lib/visual-assets";
 
 const ELEANOR_ID = "ing_eleanor";
 const ADRIAN_ID = "ing_adrian";
+const RADHA_ID = "guest_radha_arora_demo";
 
 /** Seeded staff note from Eleanor fixture — demo without pasting. */
 const ELEANOR_BREAKFAST_NOTE =
@@ -27,12 +28,18 @@ const ELEANOR_BREAKFAST_NOTE =
 const ADRIAN_LATE_ARRIVAL_NOTE =
   "OTA message: Arriving after 11 PM. Need guaranteed late check-in. Double espresso machine in room if possible.";
 
+/** Public-profile demo intake from Radha Arora's fictional executive VIP profile. */
+const RADHA_PUBLIC_PROFILE_NOTE =
+  "Public travel profile mentions interest in historic sites, restaurant and mixology scenes, vintage decor and lighting, " +
+  "arts festivals, locally inspired spa treatments, nature walks, and authentic cuisine.";
+
 const SOURCE_OPTIONS: { value: IntakeSourceType; label: string }[] = [
   { value: "reservation", label: "Reservation" },
   { value: "pre_arrival", label: "Pre-arrival" },
   { value: "vip_call", label: "VIP call" },
   { value: "staff_note", label: "Staff note" },
   { value: "past_stay", label: "Past stay" },
+  { value: "public_profile", label: "Public profile" },
   { value: "feedback_survey", label: "Feedback survey" }
 ];
 
@@ -51,11 +58,15 @@ const SIGNAL_CATEGORY_LABELS: Record<string, string> = {
   allergy_safety: "Allergy & Safety",
   arrival_logistics: "Arrival Logistics",
   billing_clarity: "Billing Clarity",
+  brand_philosophy: "Brand Philosophy",
+  business_context: "Business Context",
   communication_style: "Communication Style",
   emotional_context: "Emotional Context",
+  experience_interest: "Experience Interest",
   food_beverage: "Food & Beverage",
   housekeeping_style: "Housekeeping Style",
   housekeeping_timing: "Housekeeping Timing",
+  personal_interest: "Personal Interest",
   privacy_preference: "Privacy Preference",
   sensory_preference: "Sensory Preference",
   service_feedback: "Service Feedback",
@@ -111,6 +122,16 @@ export function GuestPulseIntakeView() {
     setSourceType("reservation");
     setSourceDepartment("reservations");
     setRawText(ADRIAN_LATE_ARRIVAL_NOTE);
+    setError(null);
+    setSignals(null);
+    setEnrichedProfile(null);
+  }
+
+  function loadRadhaPublicProfileExample() {
+    setGuestId(RADHA_ID);
+    setSourceType("public_profile");
+    setSourceDepartment("guest_relations");
+    setRawText(RADHA_PUBLIC_PROFILE_NOTE);
     setError(null);
     setSignals(null);
     setEnrichedProfile(null);
@@ -227,6 +248,9 @@ export function GuestPulseIntakeView() {
               </Button>
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={loadAdrianLateArrivalExample}>
                 Load Adrian late arrival example
+              </Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={loadRadhaPublicProfileExample}>
+                Load Radha public profile example
               </Button>
             </div>
           </div>

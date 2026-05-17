@@ -9,17 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Waveform } from "@/components/app/Waveform";
+import { useWalkieUi } from "@/components/app/WalkieUiContext";
 import { CATEGORY_META, CATEGORY_ORDER, PRIORITY_META, PRIORITY_ORDER } from "@/lib/categories";
 import { guestDisplayName, transcriptTitle } from "@/lib/format";
 import { makeClientId } from "@/lib/id";
 import { selectTicketsByGuest } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
-import type { TicketCategory, TicketPriority, WalkieIntelligence } from "@/lib/types";
+import type { TicketCategory, TicketPriority, VoiceMemoMetadata, WalkieIntelligence } from "@/lib/types";
 import { useWalkie } from "@/hooks/use-walkie";
 import { cn } from "@/lib/utils";
 
 export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full" }) {
   const { state, dispatch } = useGuestCrm();
+  const { target } = useWalkieUi();
   const [guestId, setGuestId] = useState<string>(state.focusedGuestId ?? "unfiled");
   const [ticketId, setTicketId] = useState<string>("new");
   const [category, setCategory] = useState<TicketCategory>("guest_relations");
@@ -40,6 +42,18 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
       setGuestId(state.focusedGuestId);
     }
   }, [state.focusedGuestId]);
+
+  useEffect(() => {
+    if (!target) return;
+    if (target.guestId) {
+      setGuestId(target.guestId);
+      setTicketId(target.ticketId ?? "new");
+    }
+    if (target.category) {
+      setCategory(target.category);
+      setCategoryTouched(false);
+    }
+  }, [target]);
 
   const guestTickets = useMemo(
     () => (guestId === "unfiled" ? [] : selectTicketsByGuest(state, guestId).filter((ticket) => ticket.status !== "resolved")),
@@ -195,6 +209,16 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
         }
       : undefined;
     const memoId = makeClientId("memo");
+    const memoMetadata: VoiceMemoMetadata = {
+      analysisProvider: saveIntelligence?.provider ?? "deterministic",
+      analysisModel: saveIntelligence?.model,
+      analysisVersion: saveIntelligence?.schemaVersion ?? "guestpulse-v1",
+      analysisStatus: analysisError ? "failed" : saveIntelligence?.analysisStatus ?? "pending",
+      analysisError: analysisError ?? saveIntelligence?.analysisError,
+      transcriptionModel: walkie.transcriptionModel,
+      durationSeconds: walkie.lastRecordingDurationSeconds,
+      transcribedAt: walkie.transcribedAt
+    };
 
     if (guestId === "unfiled") {
       dispatch({
@@ -205,7 +229,8 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           transcript: clean,
           category,
           priority,
-          intelligence: saveIntelligence
+          intelligence: saveIntelligence,
+          memoMetadata
         }
       });
       toast.success("Saved to Unfiled", { description: "File it to a guest when ready." });
@@ -217,7 +242,8 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           transcript: clean,
           eventId: makeClientId("e"),
           memoId,
-          intelligence: saveIntelligence
+          intelligence: saveIntelligence,
+          memoMetadata
         }
       });
       toast.success("Voice note attached", { description: saveIntelligence?.signals.length ? "GuestPulse signals captured." : undefined });
@@ -235,7 +261,8 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           title: saveIntelligence?.title ?? transcriptTitle(clean),
           detail: clean,
           voiceNote: true,
-          intelligence: saveIntelligence
+          intelligence: saveIntelligence,
+          memoMetadata
         }
       });
       toast.success("Voice ticket created", { description: saveIntelligence?.signals.length ? "GuestPulse signals captured." : undefined });
@@ -270,11 +297,11 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}
       className={cn(
-        "flex h-full flex-col overflow-hidden rounded-lg p-4 outline-none",
-        isFull ? "min-h-[calc(100dvh-8rem)] pb-[max(var(--safe-bottom),1rem)]" : "min-h-[calc(100dvh-6rem)]"
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-xl outline-none",
+        isFull ? "min-h-[min(760px,calc(100dvh-2rem))]" : "min-h-0"
       )}
     >
-      <header className="flex items-start justify-between gap-3 border-b pb-4">
+      <header className="flex shrink-0 items-start justify-between gap-3 border-b px-4 py-3">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Radio className="size-4 text-primary" />
@@ -285,7 +312,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
         <span className="rounded-full bg-secondary px-2 py-1 font-mono text-xs">{formatElapsed(walkie.elapsedSeconds)}</span>
       </header>
 
-      <div className={cn("grid gap-3 py-4", isFull ? "sm:grid-cols-2 md:grid-cols-4" : "grid-cols-1")}>
+      <div className={cn("grid shrink-0 gap-2 border-b px-4 py-3", isFull ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1")}>
         <div className="grid gap-1.5">
           <Label>Guest</Label>
           <Select value={guestId} onValueChange={(value) => setGuestId(value)}>
@@ -350,7 +377,8 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex flex-col items-center gap-3">
         {walkie.permissionState === "denied" ? (
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
             Microphone access is blocked. On iPhone, open the HTTPS preview in Safari or the installed home-screen app,
@@ -397,12 +425,12 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           disabled={micUnavailable || walkie.isTranscribing}
           className={cn(
             "touch-none select-none relative flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_18px_60px_oklch(0.32_0.04_40/0.26)] transition-transform",
-            isFull ? "size-[168px]" : "size-24",
+            isFull ? "size-28 sm:size-36 md:size-[168px]" : "size-24",
             walkie.isRecording && "animate-recording-pulse",
             (micUnavailable || walkie.isTranscribing) && "opacity-50"
           )}
         >
-          {walkie.isRecording ? <Mic className={isFull ? "size-14" : "size-9"} /> : <MicOff className={isFull ? "size-14" : "size-9"} />}
+          {walkie.isRecording ? <Mic className={isFull ? "size-12 md:size-14" : "size-9"} /> : <MicOff className={isFull ? "size-12 md:size-14" : "size-9"} />}
           {walkie.isRecording ? (
             <span className="animate-ring-spin absolute -inset-3 rounded-full border-2 border-dashed border-accent" />
           ) : null}
@@ -416,16 +444,16 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           <p className="mt-1 text-xs text-muted-foreground md:hidden">Touch and hold the mic.</p>
         </div>
         <Waveform level={walkie.audioLevel} className={isFull ? "w-full max-w-lg" : "w-full"} />
-      </div>
+        </div>
 
-      <div className="space-y-3 border-t pt-4">
+        <div className="mt-4 space-y-3 border-t pt-4">
         <div className="rounded-md bg-background/65 p-3">
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
             <span>Live transcript</span>
             <span>{new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
           </div>
           {!typedMode ? (
-            <div aria-live="polite" className="min-h-24 space-y-2 font-mono text-sm">
+            <div aria-live="polite" className="max-h-44 min-h-24 space-y-2 overflow-y-auto font-mono text-sm">
               {walkie.segments.map((segment) => (
                 <p key={segment.id}>{segment.text}</p>
               ))}
@@ -443,7 +471,7 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
               onChange={(event) => setTypedFallback(event.target.value)}
               aria-label="Type your note"
               placeholder="Type the note if transcription fails or microphone access is blocked."
-              className="min-h-28"
+              className="max-h-48 min-h-28"
             />
           )}
         </div>
@@ -482,31 +510,33 @@ export function WalkiePanel({ variant = "docked" }: { variant?: "docked" | "full
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          <Button onClick={save} disabled={walkie.isTranscribing || isAnalyzing} className="min-h-10 flex-1">
-            <Save className="size-4" />
-            {walkie.isTranscribing ? "Transcribing..." : isAnalyzing ? "Analyzing..." : "Save as voice note"}
-          </Button>
-          <Button variant="outline" onClick={discard} className="min-h-10">
-            <RotateCcw className="size-4" />
-            Discard
-          </Button>
-          <Button variant="ghost" onClick={() => void copyTranscript()} className="min-h-10">
-            <Clipboard className="size-4" />
-            Copy
-          </Button>
-          {guestId !== "unfiled" ? (
-            <Button
-              variant="ghost"
-              onClick={() => dispatch({ type: "OPEN_NEW_TICKET", payload: { guestId, category } })}
-              className="min-h-10"
-            >
-              <Send className="size-4" />
-              Ticket
-            </Button>
-          ) : null}
         </div>
       </div>
+
+      <footer className="shrink-0 space-y-2 border-t bg-background/82 p-3 pb-[max(var(--safe-bottom),0.75rem)] backdrop-blur">
+        <Button onClick={save} disabled={walkie.isTranscribing || isAnalyzing || !transcript.trim()} className="min-h-11 w-full">
+          <Save className="size-4" />
+          {walkie.isTranscribing ? "Transcribing..." : isAnalyzing ? "Analyzing..." : "Save voice note"}
+        </Button>
+        <div className="grid grid-cols-3 gap-2">
+          <Button variant="outline" onClick={discard} className="min-h-11">
+            <RotateCcw className="size-4" />
+            <span className="hidden min-[390px]:inline">Discard</span>
+          </Button>
+          <Button variant="outline" onClick={() => void copyTranscript()} disabled={!transcript.trim()} className="min-h-11">
+            <Clipboard className="size-4" />
+            <span className="hidden min-[390px]:inline">Copy</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => dispatch({ type: "OPEN_NEW_TICKET", payload: { guestId: guestId === "unfiled" ? undefined : guestId, category } })}
+            className="min-h-11"
+          >
+            <Send className="size-4" />
+            <span className="hidden min-[390px]:inline">Ticket</span>
+          </Button>
+        </div>
+      </footer>
     </section>
   );
 }
@@ -526,6 +556,9 @@ function isWalkieIntelligence(value: unknown): value is WalkieIntelligence {
       "title" in value &&
       "routeConfidence" in value &&
       "signals" in value &&
+      "schemaVersion" in value &&
+      "provider" in value &&
+      "analysisStatus" in value &&
       Array.isArray(value.signals)
   );
 }

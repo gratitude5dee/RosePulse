@@ -10,6 +10,7 @@ const intakeSourceTypeSchema = z.enum([
   "vip_call",
   "staff_note",
   "past_stay",
+  "public_profile",
   "feedback_survey",
   "voice_note"
 ]);
@@ -58,7 +59,7 @@ function parseBody(body: unknown): GuestPulseIngestBody | GuestPulseIngestFailur
     return {
       status: 400,
       error:
-        "sourceType must be one of: reservation, pre_arrival, vip_call, staff_note, past_stay, feedback_survey, voice_note"
+        "sourceType must be one of: reservation, pre_arrival, vip_call, staff_note, past_stay, public_profile, feedback_survey, voice_note"
     };
   }
 

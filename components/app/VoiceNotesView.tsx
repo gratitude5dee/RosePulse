@@ -24,13 +24,13 @@ export function VoiceNotesView() {
   const { state, dispatch } = useGuestCrm();
   const [search, setSearch] = useState("");
   const [guestId, setGuestId] = useState<string>("all");
-  const [category, setCategory] = useState<TicketCategory | "all">("all");
   const [priority, setPriority] = useState<TicketPriority | "all">("all");
   const [status, setStatus] = useState<VoiceNoteMemoStatus | "all">("all");
   const [preferenceCategory, setPreferenceCategory] = useState<PreferenceCategory | "all">("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [fileTargets, setFileTargets] = useState<Record<string, string>>({});
+  const category = state.categoryFocus;
 
   const memos = useMemo(
     () =>
@@ -70,14 +70,24 @@ export function VoiceNotesView() {
         createdEventId: makeClientId("e"),
         voiceNoteEventId: makeClientId("e"),
         priority: memo.priority,
-        intelligence: memo.intelligence
+        intelligence: memo.intelligence,
+        memoMetadata: {
+          analysisProvider: memo.analysisProvider,
+          analysisModel: memo.analysisModel,
+          analysisVersion: memo.analysisVersion,
+          analysisStatus: memo.analysisStatus,
+          analysisError: memo.analysisError,
+          transcriptionModel: memo.transcriptionModel,
+          durationSeconds: memo.durationSeconds,
+          transcribedAt: memo.transcribedAt
+        }
       }
     });
     toast.success("Voice memo filed", { description: "A ticket and preference evidence were linked to the guest profile." });
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-safe py-4 md:px-8 md:py-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Walkie archive</p>
@@ -109,7 +119,11 @@ export function VoiceNotesView() {
             </SelectItem>
           ))}
         </FilterSelect>
-        <FilterSelect label="Category" value={category} onValueChange={(value) => setCategory(value as TicketCategory | "all")}>
+        <FilterSelect
+          label="Category"
+          value={category}
+          onValueChange={(value) => dispatch({ type: "SET_CATEGORY_FOCUS", payload: { category: value as TicketCategory | "all" } })}
+        >
           <SelectItem value="all">All categories</SelectItem>
           {CATEGORY_ORDER.map((item) => (
             <SelectItem key={item} value={item}>

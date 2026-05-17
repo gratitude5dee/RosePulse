@@ -2,7 +2,16 @@ import { guestFixtures } from "@/lib/fixtures/guests";
 import { isoDateFromToday, isoDateTimeFromNow } from "@/lib/format";
 import type { Guest, GuestPulseGuestFixture, GuestSignal, IntakeRecord } from "@/lib/types";
 
+const RADHA_ID = "guest_radha_arora_demo";
 const PRIYA_ID = "g_0503";
+
+function requireRadhaGuest(): Guest {
+  const guest = guestFixtures.find((g) => g.id === RADHA_ID);
+  if (!guest) {
+    throw new Error("GuestPulse mock: Radha Arora fixture missing from lib/fixtures/guests");
+  }
+  return guest;
+}
 
 function requirePriyaGuest(): Guest {
   const guest = guestFixtures.find((g) => g.id === PRIYA_ID);
@@ -11,6 +20,96 @@ function requirePriyaGuest(): Guest {
   }
   return guest;
 }
+
+const radhaGuest = requireRadhaGuest();
+
+const radhaIntake: IntakeRecord[] = [
+  {
+    id: "intake_radha_001",
+    guestId: RADHA_ID,
+    sourceType: "reservation",
+    sourceDepartment: "front_office",
+    rawText:
+      "Executive VIP arrival for Rosewood Sand Hill hospitality innovation review. Guest has limited time on property and values discreet, polished service. Arrival expected late afternoon.",
+    capturedAt: "2026-05-16T10:30:00.000Z"
+  },
+  {
+    id: "intake_radha_002",
+    guestId: RADHA_ID,
+    sourceType: "public_profile",
+    sourceDepartment: "guest_relations",
+    rawText:
+      "Public interviews suggest guest values sense of place, local culture, handcrafted details, and hospitality that creates lasting memories rather than generic luxury.",
+    capturedAt: "2026-05-16T11:00:00.000Z"
+  },
+  {
+    id: "intake_radha_003",
+    guestId: RADHA_ID,
+    sourceType: "public_profile",
+    sourceDepartment: "concierge",
+    rawText:
+      "Public travel profile mentions interest in historic sites, restaurant and mixology scenes, vintage decor and lighting, arts festivals, locally inspired spa treatments, nature walks, and authentic cuisine.",
+    capturedAt: "2026-05-16T11:10:00.000Z"
+  },
+  {
+    id: "intake_radha_004",
+    guestId: RADHA_ID,
+    sourceType: "staff_note",
+    sourceDepartment: "guest_relations",
+    rawText:
+      "During arrival conversation, guest asked whether the team had noticed any details that make Rosewood Sand Hill feel uniquely Silicon Valley rather than just generically luxurious.",
+    capturedAt: "2026-05-16T16:45:00.000Z"
+  }
+];
+
+const radhaExpectedSignals: GuestSignal[] = [
+  {
+    id: "signal_radha_001",
+    category: "brand_philosophy",
+    value: "Guest cares deeply about sense of place and local cultural expression",
+    evidence: "values sense of place, local culture, handcrafted details",
+    confidence: 0.94,
+    privacySensitivity: "low",
+    sourceRecordIds: ["intake_radha_002"]
+  },
+  {
+    id: "signal_radha_002",
+    category: "personal_interest",
+    value: "Guest is interested in design details, vintage decor, and lighting",
+    evidence: "interest in vintage decor and lighting",
+    confidence: 0.92,
+    privacySensitivity: "low",
+    sourceRecordIds: ["intake_radha_003"]
+  },
+  {
+    id: "signal_radha_003",
+    category: "experience_interest",
+    value: "Guest may appreciate locally grounded cultural, dining, and nature experiences",
+    evidence:
+      "historic sites, restaurant and mixology scenes, arts festivals, locally inspired spa treatments, nature walks, and authentic cuisine",
+    confidence: 0.76,
+    privacySensitivity: "low",
+    sourceRecordIds: ["intake_radha_003"]
+  },
+  {
+    id: "signal_radha_004",
+    category: "business_context",
+    value: "Guest is evaluating whether the property experience reflects Rosewood Sand Hill's Silicon Valley identity",
+    evidence: "asked whether the team had noticed any details that make Rosewood Sand Hill feel uniquely Silicon Valley",
+    confidence: 0.9,
+    privacySensitivity: "medium",
+    sourceRecordIds: ["intake_radha_004"]
+  },
+  {
+    id: "signal_radha_005",
+    category: "privacy_preference",
+    value: "Guest likely expects discreet, polished service due to executive VIP context",
+    evidence: "Executive VIP arrival and values discreet, polished service",
+    confidence: 0.78,
+    privacySensitivity: "medium",
+    sourceRecordIds: ["intake_radha_001"]
+  }
+];
 
 const eleanorGuest: Guest = {
   id: "ing_eleanor",
@@ -181,8 +280,14 @@ const priyaIntake: IntakeRecord[] = [
   }
 ];
 
-/** Three GuestPulse demo profiles aligned with PLAN.md (Eleanor is primary). */
+/** GuestPulse demo profiles aligned with PLAN.md (Radha is the executive VIP public-profile example). */
 export const guestPulseMockGuests: GuestPulseGuestFixture[] = [
+  {
+    guest: radhaGuest,
+    segment: "Executive VIP hospitality innovation review",
+    existingSignals: radhaExpectedSignals,
+    intakeRecords: radhaIntake
+  },
   {
     guest: eleanorGuest,
     segment: "Wellness-minded Platinum in-house guest",

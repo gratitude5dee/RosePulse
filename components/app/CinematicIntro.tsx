@@ -56,10 +56,11 @@ export function CinematicIntro() {
         fill
         priority
         sizes="100vw"
-        className={cn("object-cover", reducedMotion ? "" : "animate-intro-ken-burns")}
+        className={cn("object-cover object-center", reducedMotion ? "" : "animate-intro-ken-burns")}
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,oklch(0.13_0.012_60/0.86),oklch(0.18_0.015_60/0.48)_48%,oklch(0.18_0.015_60/0.16))]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_70%,oklch(0.78_0.09_78/0.18),transparent_34%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,oklch(0.13_0.012_60/0.82),oklch(0.18_0.015_60/0.42)_46%,oklch(0.18_0.015_60/0.10))]" />
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(0deg,oklch(0.13_0.012_60/0.72),transparent)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_68%,oklch(0.78_0.09_78/0.16),transparent_32%)]" />
 
       <button
         type="button"
@@ -72,12 +73,12 @@ export function CinematicIntro() {
 
       <div className="relative z-10 flex min-h-dvh items-end px-safe pb-[max(var(--safe-bottom),1.5rem)] pt-safe">
         <div className="w-full max-w-3xl p-5 sm:p-8 lg:p-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-foreground/72">Rosewood Sand Hill</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary-foreground/72">Rosewood Sand Hill</p>
           <h1 id="rosepulse-intro-title" className="mt-3 font-serif text-5xl font-medium leading-[0.95] text-primary-foreground sm:text-7xl">
             RosePulse
           </h1>
           <p className="mt-5 max-w-lg text-base leading-7 text-primary-foreground/78 sm:text-lg">
-            A calm command center for the stay, the team, and every detail guests expect before they ask.
+            The property opens into service rhythm: arrivals, requests, memos, and the next detail before it is spoken.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Button type="button" variant="secondary" onClick={dismiss} className="min-h-11 px-5">

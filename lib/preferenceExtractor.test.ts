@@ -3,7 +3,12 @@ import { guestPulseMockGuests } from "@/lib/mockGuests";
 import type { IntakeRecord } from "@/lib/types";
 import { preferenceExtractor } from "@/lib/preferenceExtractor";
 
-const eleanorFixture = guestPulseMockGuests[0];
+const eleanorFixture = guestPulseMockGuests.find((row) => row.guest.id === "ing_eleanor");
+
+if (!eleanorFixture) {
+  throw new Error("GuestPulse test fixture: Eleanor fixture missing");
+}
+
 const eleanorStaffNote = eleanorFixture.intakeRecords.find((r) => r.id === "ir_el_staff_01");
 
 if (!eleanorStaffNote) {

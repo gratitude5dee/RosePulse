@@ -2,17 +2,21 @@ import { bumpPriority, CATEGORY_META, getEscalationTarget } from "@/lib/categori
 import { transcriptTitle } from "@/lib/format";
 import { makeClientId } from "@/lib/id";
 import type {
+  GuestPreferenceEvidence,
   GuestPreference,
   GuestCrmState,
   NewTicketDraft,
   PreferenceCategory,
+  PreferenceStatus,
   StaffRole,
+  CategoryFocus,
   Ticket,
   TicketCategory,
   TicketEvent,
   TicketPriority,
   TicketStatus,
   UnfiledVoiceNote,
+  VoiceMemoMetadata,
   VoiceNoteMemo,
   WalkieIntelligence
 } from "@/lib/types";
@@ -34,6 +38,7 @@ export type GuestCrmAction =
         voiceNoteEventId?: string;
         memoId?: string;
         intelligence?: WalkieIntelligence;
+        memoMetadata?: VoiceMemoMetadata;
       };
     }
   | { type: "UPDATE_TICKET_STATUS"; payload: { ticketId: string; status: TicketStatus } }
@@ -41,16 +46,25 @@ export type GuestCrmAction =
   | { type: "ADD_TICKET_COMMENT"; payload: { ticketId: string; body: string } }
   | {
       type: "ADD_VOICE_NOTE";
-      payload: { ticketId: string; transcript: string; audioUrl?: string; eventId?: string; memoId?: string; intelligence?: WalkieIntelligence };
+      payload: {
+        ticketId: string;
+        transcript: string;
+        audioUrl?: string;
+        eventId?: string;
+        memoId?: string;
+        intelligence?: WalkieIntelligence;
+        memoMetadata?: VoiceMemoMetadata;
+      };
     }
   | { type: "ASSIGN_TICKET"; payload: { ticketId: string; assignedTo: StaffRole } }
   | { type: "SET_PRIORITY"; payload: { ticketId: string; priority: TicketPriority } }
+  | { type: "SET_CATEGORY_FOCUS"; payload: { category: CategoryFocus } }
   | { type: "SET_FOCUSED_GUEST"; payload: { guestId?: string } }
   | { type: "OPEN_GUEST_DETAIL"; payload: { guestId: string; ticketId?: string } }
   | { type: "CLOSE_GUEST_DETAIL" }
   | { type: "OPEN_NEW_TICKET"; payload?: NewTicketDraft }
   | { type: "CLOSE_NEW_TICKET" }
-  | { type: "ADD_UNFILED_NOTE"; payload: Omit<UnfiledVoiceNote, "id" | "createdAt"> & { noteId?: string; memoId?: string } }
+  | { type: "ADD_UNFILED_NOTE"; payload: Omit<UnfiledVoiceNote, "id" | "createdAt"> & { noteId?: string; memoId?: string; memoMetadata?: VoiceMemoMetadata } }
   | {
       type: "FILE_UNFILED_NOTE";
       payload: {
@@ -62,8 +76,10 @@ export type GuestCrmAction =
         voiceNoteEventId?: string;
         memoId?: string;
         intelligence?: WalkieIntelligence;
+        memoMetadata?: VoiceMemoMetadata;
       };
     }
+  | { type: "RESOLVE_GUEST_PREFERENCE"; payload: { preferenceId: string; status: Exclude<PreferenceStatus, "candidate">; note?: string } }
   | { type: "SET_BACKEND_SYNC"; payload: Partial<GuestCrmState["backend"]> }
   | { type: "REPLACE_STORE"; payload: GuestCrmState };
 
@@ -76,7 +92,7 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function makeId(prefix: "t" | "e" | "u" | "pref" | "memo") {
+function makeId(prefix: "t" | "e" | "u" | "pref" | "memo" | "pe") {
   return makeClientId(prefix);
 }
 
@@ -95,26 +111,60 @@ function makeEvent(
   };
 }
 
-function makeGuestPreferences(input: {
+function makeGuestPreferenceArtifacts(input: {
   guestId: string;
   intelligence?: WalkieIntelligence;
   evidenceIds: string[];
-}): GuestPreference[] {
-  if (!input.intelligence?.signals.length) return [];
+  ticketId?: string;
+  ticketEventId?: string;
+  unfiledVoiceNoteId?: string;
+  voiceNoteMemoId?: string;
+}): { preferences: GuestPreference[]; evidence: GuestPreferenceEvidence[] } {
+  if (!input.intelligence?.signals.length) return { preferences: [], evidence: [] };
   const now = nowIso();
-  return input.intelligence.signals.map((signal) => ({
-    id: makeId("pref"),
-    guestId: input.guestId,
-    category: signal.preferenceCategory,
-    label: signal.label,
-    detail: signal.detail,
-    confidence: signal.confidence,
-    status: "candidate",
-    sourceType: "voice_note",
-    evidenceIds: input.evidenceIds,
-    createdAt: now,
-    updatedAt: now
-  }));
+  const preferences: GuestPreference[] = [];
+  const evidence: GuestPreferenceEvidence[] = [];
+  for (const signal of input.intelligence.signals) {
+    const preferenceId = makeId("pref");
+    const evidenceId = makeId("pe");
+    const normalizedSignalKey = preferenceKey({
+      guestId: input.guestId,
+      category: signal.preferenceCategory,
+      label: signal.label,
+      detail: signal.detail
+    });
+    preferences.push({
+      id: preferenceId,
+      guestId: input.guestId,
+      category: signal.preferenceCategory,
+      label: signal.label,
+      detail: signal.detail,
+      confidence: signal.confidence,
+      status: "candidate",
+      sourceType: "voice_note",
+      privacySensitivity: signal.privacySensitivity,
+      normalizedSignalKey,
+      analysisVersion: input.intelligence.schemaVersion,
+      lastSeenAt: now,
+      evidenceIds: [...input.evidenceIds, evidenceId],
+      createdAt: now,
+      updatedAt: now
+    });
+    evidence.push({
+      id: evidenceId,
+      preferenceId,
+      ticketId: input.ticketId,
+      ticketEventId: input.ticketEventId,
+      unfiledVoiceNoteId: input.unfiledVoiceNoteId,
+      voiceNoteMemoId: input.voiceNoteMemoId,
+      quote: signal.evidence,
+      confidence: signal.confidence,
+      privacySensitivity: signal.privacySensitivity,
+      analysisVersion: input.intelligence.schemaVersion,
+      createdAt: now
+    });
+  }
+  return { preferences, evidence };
 }
 
 function makeVoiceMemo(input: {
@@ -129,6 +179,7 @@ function makeVoiceMemo(input: {
   ticketEventId?: string;
   unfiledVoiceNoteId?: string;
   intelligence?: WalkieIntelligence;
+  metadata?: VoiceMemoMetadata;
   createdAt?: string;
   filedAt?: string;
 }): VoiceNoteMemo {
@@ -147,6 +198,14 @@ function makeVoiceMemo(input: {
     preferenceCategories,
     createdAt,
     updatedAt: nowIso(),
+    analysisProvider: input.metadata?.analysisProvider ?? input.intelligence?.provider ?? "deterministic",
+    analysisModel: input.metadata?.analysisModel ?? input.intelligence?.model,
+    analysisVersion: input.metadata?.analysisVersion ?? input.intelligence?.schemaVersion ?? "guestpulse-v1",
+    analysisStatus: input.metadata?.analysisStatus ?? input.intelligence?.analysisStatus ?? "analyzed",
+    analysisError: input.metadata?.analysisError ?? input.intelligence?.analysisError,
+    transcriptionModel: input.metadata?.transcriptionModel,
+    durationSeconds: input.metadata?.durationSeconds,
+    transcribedAt: input.metadata?.transcribedAt,
     guestId: input.guestId,
     ticketId: input.ticketId,
     ticketEventId: input.ticketEventId,
@@ -169,16 +228,57 @@ function preferenceKey(preference: Pick<GuestPreference, "guestId" | "category" 
     .trim();
 }
 
-function mergePreferences(existing: GuestPreference[], incoming: GuestPreference[]) {
-  if (incoming.length === 0) return existing;
-  const seen = new Set(existing.map(preferenceKey));
-  const uniqueIncoming = incoming.filter((preference) => {
+function mergePreferenceArtifacts(
+  existingPreferences: GuestPreference[],
+  existingEvidence: GuestPreferenceEvidence[],
+  incomingPreferences: GuestPreference[],
+  incomingEvidence: GuestPreferenceEvidence[]
+) {
+  if (incomingPreferences.length === 0) {
+    return { preferences: existingPreferences, evidence: existingEvidence };
+  }
+  const byKey = new Map(existingPreferences.map((preference) => [preferenceKey(preference), preference]));
+  const nextPreferences = [...existingPreferences];
+  const nextEvidence = [...existingEvidence];
+
+  for (const preference of incomingPreferences) {
     const key = preferenceKey(preference);
+    const existing = byKey.get(key);
+    const evidenceForPreference = incomingEvidence.filter((evidence) => evidence.preferenceId === preference.id);
+    if (existing) {
+      const remappedEvidence = evidenceForPreference.map((evidence) => ({ ...evidence, preferenceId: existing.id }));
+      nextEvidence.push(...dedupeEvidence(nextEvidence, remappedEvidence));
+      const evidenceIds = Array.from(new Set([...existing.evidenceIds, ...remappedEvidence.map((evidence) => evidence.id)]));
+      const index = nextPreferences.findIndex((item) => item.id === existing.id);
+      nextPreferences[index] = {
+        ...existing,
+        confidence: Math.max(existing.confidence, preference.confidence),
+        lastSeenAt: preference.lastSeenAt,
+        updatedAt: preference.updatedAt,
+        evidenceIds
+      };
+    } else {
+      byKey.set(key, preference);
+      nextPreferences.unshift(preference);
+      nextEvidence.push(...evidenceForPreference);
+    }
+  }
+
+  return { preferences: nextPreferences, evidence: nextEvidence };
+}
+
+function dedupeEvidence(existing: GuestPreferenceEvidence[], incoming: GuestPreferenceEvidence[]) {
+  const seen = new Set(
+    existing.map((evidence) =>
+      [evidence.preferenceId, evidence.ticketEventId, evidence.voiceNoteMemoId, evidence.unfiledVoiceNoteId, evidence.quote].join("|")
+    )
+  );
+  return incoming.filter((evidence) => {
+    const key = [evidence.preferenceId, evidence.ticketEventId, evidence.voiceNoteMemoId, evidence.unfiledVoiceNoteId, evidence.quote].join("|");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  return uniqueIncoming.length > 0 ? [...uniqueIncoming, ...existing] : existing;
 }
 
 function updateTicket(state: GuestCrmState, ticketId: string, updater: (ticket: Ticket) => Ticket): GuestCrmState {
@@ -213,7 +313,8 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
             guestId: action.payload.guestId,
             ticketId,
             ticketEventId: voiceEvent.id,
-            intelligence: action.payload.intelligence
+            intelligence: action.payload.intelligence,
+            metadata: action.payload.memoMetadata
           })
         : undefined;
       const ticket: Ticket = {
@@ -231,15 +332,25 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         dueAt: action.payload.dueAt,
         events: voiceEvent ? [createdEvent, voiceEvent] : [createdEvent]
       };
-      const preferences = makeGuestPreferences({
+      const preferenceArtifacts = makeGuestPreferenceArtifacts({
         guestId: action.payload.guestId,
         intelligence: action.payload.intelligence,
-        evidenceIds: [voiceEvent?.id ?? createdEvent.id, memo?.id].filter((id): id is string => Boolean(id))
+        evidenceIds: [voiceEvent?.id ?? createdEvent.id, memo?.id].filter((id): id is string => Boolean(id)),
+        ticketId,
+        ticketEventId: voiceEvent?.id ?? createdEvent.id,
+        voiceNoteMemoId: memo?.id
       });
+      const merged = mergePreferenceArtifacts(
+        state.preferences,
+        state.preferenceEvidence,
+        preferenceArtifacts.preferences,
+        preferenceArtifacts.evidence
+      );
       return {
         ...state,
         tickets: [ticket, ...state.tickets],
-        preferences: mergePreferences(state.preferences, preferences),
+        preferences: merged.preferences,
+        preferenceEvidence: merged.evidence,
         voiceMemos: memo ? [memo, ...state.voiceMemos] : state.voiceMemos,
         newTicketOpen: false,
         newTicketDraft: undefined
@@ -312,13 +423,23 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         guestId: ticket.guestId,
         ticketId: ticket.id,
         ticketEventId: event.id,
-        intelligence: action.payload.intelligence
+        intelligence: action.payload.intelligence,
+        metadata: action.payload.memoMetadata
       });
-      const preferences = makeGuestPreferences({
+      const preferenceArtifacts = makeGuestPreferenceArtifacts({
         guestId: ticket.guestId,
         intelligence: action.payload.intelligence,
-        evidenceIds: [event.id, memo.id]
+        evidenceIds: [event.id, memo.id],
+        ticketId: ticket.id,
+        ticketEventId: event.id,
+        voiceNoteMemoId: memo.id
       });
+      const merged = mergePreferenceArtifacts(
+        state.preferences,
+        state.preferenceEvidence,
+        preferenceArtifacts.preferences,
+        preferenceArtifacts.evidence
+      );
       return {
         ...state,
         tickets: state.tickets.map((item) =>
@@ -331,7 +452,8 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
             : item
         ),
         voiceMemos: [memo, ...state.voiceMemos],
-        preferences: mergePreferences(state.preferences, preferences)
+        preferences: merged.preferences,
+        preferenceEvidence: merged.evidence
       };
     }
     case "ASSIGN_TICKET":
@@ -353,6 +475,8 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         priority: action.payload.priority,
         updatedAt: nowIso()
       }));
+    case "SET_CATEGORY_FOCUS":
+      return { ...state, categoryFocus: action.payload.category };
     case "SET_FOCUSED_GUEST":
       return { ...state, focusedGuestId: action.payload.guestId };
     case "OPEN_GUEST_DETAIL":
@@ -380,6 +504,7 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         status: "unfiled",
         unfiledVoiceNoteId: noteId,
         intelligence: action.payload.intelligence,
+        metadata: action.payload.memoMetadata,
         createdAt
       });
       return {
@@ -450,6 +575,14 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
             ticketEventId: voiceEvent.id,
             filedAt,
             updatedAt: filedAt,
+            analysisProvider: action.payload.memoMetadata?.analysisProvider ?? existingMemo.analysisProvider,
+            analysisModel: action.payload.memoMetadata?.analysisModel ?? existingMemo.analysisModel,
+            analysisVersion: action.payload.memoMetadata?.analysisVersion ?? existingMemo.analysisVersion,
+            analysisStatus: action.payload.memoMetadata?.analysisStatus ?? existingMemo.analysisStatus,
+            analysisError: action.payload.memoMetadata?.analysisError ?? existingMemo.analysisError,
+            transcriptionModel: action.payload.memoMetadata?.transcriptionModel ?? existingMemo.transcriptionModel,
+            durationSeconds: action.payload.memoMetadata?.durationSeconds ?? existingMemo.durationSeconds,
+            transcribedAt: action.payload.memoMetadata?.transcribedAt ?? existingMemo.transcribedAt,
             intelligence: action.payload.intelligence ?? note.intelligence ?? existingMemo.intelligence
           }
         : makeVoiceMemo({
@@ -464,17 +597,29 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
             ticketEventId: voiceEvent.id,
             unfiledVoiceNoteId: note.id,
             intelligence: action.payload.intelligence ?? note.intelligence,
+            metadata: action.payload.memoMetadata,
             filedAt
           });
-      const preferences = makeGuestPreferences({
+      const preferenceArtifacts = makeGuestPreferenceArtifacts({
         guestId: action.payload.guestId,
         intelligence: action.payload.intelligence ?? note.intelligence,
-        evidenceIds: [voiceEvent.id, filedMemo.id]
+        evidenceIds: [voiceEvent.id, filedMemo.id],
+        ticketId,
+        ticketEventId: voiceEvent.id,
+        unfiledVoiceNoteId: note.id,
+        voiceNoteMemoId: filedMemo.id
       });
+      const merged = mergePreferenceArtifacts(
+        state.preferences,
+        state.preferenceEvidence,
+        preferenceArtifacts.preferences,
+        preferenceArtifacts.evidence
+      );
       return {
         ...state,
         tickets: [ticket, ...state.tickets],
-        preferences: mergePreferences(state.preferences, preferences),
+        preferences: merged.preferences,
+        preferenceEvidence: merged.evidence,
         voiceMemos: existingMemo
           ? state.voiceMemos.map((memo) => (memo.id === existingMemo.id ? filedMemo : memo))
           : [filedMemo, ...state.voiceMemos],
@@ -490,6 +635,22 @@ export function guestCrmReducer(state: GuestCrmState, action: GuestCrmAction): G
         )
       };
     }
+    case "RESOLVE_GUEST_PREFERENCE":
+      return {
+        ...state,
+        preferences: state.preferences.map((preference) =>
+          preference.id === action.payload.preferenceId
+            ? {
+                ...preference,
+                status: action.payload.status,
+                reviewNote: action.payload.note,
+                resolvedBy: CURRENT_STAFF.id,
+                resolvedAt: nowIso(),
+                updatedAt: nowIso()
+              }
+            : preference
+        )
+      };
     case "SET_BACKEND_SYNC":
       return {
         ...state,

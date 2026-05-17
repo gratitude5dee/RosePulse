@@ -1,18 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Columns3, List } from "lucide-react";
+import { AlertTriangle, Columns3, List, Mic2, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { GuestAvatar } from "@/components/app/GuestAvatar";
 import { PriorityBadge } from "@/components/app/PriorityBadge";
 import { StatusPill } from "@/components/app/StatusPill";
 import { TicketRow } from "@/components/app/TicketRow";
-import { CATEGORY_META, CATEGORY_ORDER, PRIORITY_META, PRIORITY_ORDER, ROLE_LABELS, STATUS_LABELS } from "@/lib/categories";
+import { CATEGORY_META, PRIORITY_META, PRIORITY_ORDER, ROLE_LABELS, STATUS_LABELS } from "@/lib/categories";
 import { formatAge, guestDisplayName } from "@/lib/format";
-import { selectGuestById, selectTicketBoard } from "@/lib/store/selectors";
+import { selectAttentionQueue, selectGuestById, selectTicketBoard } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
-import type { StaffRole, Ticket, TicketCategory, TicketPriority, TicketStatus } from "@/lib/types";
+import type { StaffRole, Ticket, TicketPriority, TicketStatus } from "@/lib/types";
 
 const statuses: Array<TicketStatus | "all"> = ["all", "open", "in_progress", "blocked", "escalated", "resolved"];
 const assignees: Array<StaffRole | "all"> = [
@@ -28,12 +29,13 @@ const assignees: Array<StaffRole | "all"> = [
 
 export function TicketsView() {
   const { state, dispatch } = useGuestCrm();
-  const [category, setCategory] = useState<TicketCategory | "all">("all");
   const [priority, setPriority] = useState<TicketPriority | "all">("all");
   const [status, setStatus] = useState<TicketStatus | "all">("all");
   const [assignedTo, setAssignedTo] = useState<StaffRole | "all">("all");
   const [view, setView] = useState<"list" | "kanban">("list");
+  const category = state.categoryFocus;
   const tickets = selectTicketBoard(state, { category, priority, status, assignedTo });
+  const attentionQueue = selectAttentionQueue(state);
 
   const groupedByPriority = useMemo(() => {
     return PRIORITY_ORDER.toReversed().map((item) => ({
@@ -47,7 +49,7 @@ export function TicketsView() {
   }
 
   return (
-    <div className="px-safe py-6 md:px-8">
+    <div className="px-safe py-4 md:px-8 md:py-6">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="display-1">Tickets</h1>
@@ -65,16 +67,21 @@ export function TicketsView() {
         </div>
       </div>
 
-      <div className="mb-5 grid gap-3 rounded-lg border bg-background/62 p-3 lg:grid-cols-[1fr_180px_180px_220px]">
-        <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
-          <Button className="shrink-0" size="sm" variant={category === "all" ? "default" : "outline"} onClick={() => setCategory("all")}>
-            All
-          </Button>
-          {CATEGORY_ORDER.map((item) => (
-            <Button key={item} className="shrink-0" size="sm" variant={category === item ? "default" : "outline"} onClick={() => setCategory(item)}>
-              {CATEGORY_META[item].label}
+      <div className="mb-5 grid gap-3 rounded-lg border bg-background/62 p-3 lg:grid-cols-[minmax(180px,1fr)_180px_180px_220px]">
+        <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border bg-background/70 px-3 text-sm">
+          <span className="text-muted-foreground">Operations</span>
+          <span className="truncate font-medium">{category === "all" ? "All categories" : CATEGORY_META[category].label}</span>
+          {category !== "all" ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 shrink-0 px-2 text-xs"
+              onClick={() => dispatch({ type: "SET_CATEGORY_FOCUS", payload: { category: "all" } })}
+            >
+              Clear
             </Button>
-          ))}
+          ) : null}
         </div>
         <Select value={priority} onValueChange={(value) => setPriority(value as TicketPriority | "all")}>
           <SelectTrigger>
@@ -114,6 +121,49 @@ export function TicketsView() {
           </SelectContent>
         </Select>
       </div>
+
+      {attentionQueue.length > 0 ? (
+        <section className="mb-5 rounded-lg border bg-background/72 p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">SLA attention</p>
+              <h2 className="font-serif text-2xl font-medium">Next operational moves</h2>
+            </div>
+            <Badge variant="champagne">{attentionQueue.length} items</Badge>
+          </div>
+          <div className="grid gap-2 lg:grid-cols-3">
+            {attentionQueue.slice(0, 6).map((item) => {
+              const guest = item.guestId ? selectGuestById(state, item.guestId) : undefined;
+              const Icon = item.type === "memo" ? Mic2 : item.type === "preference" ? Sparkles : AlertTriangle;
+              return (
+                <button
+                  type="button"
+                  key={`${item.type}-${item.id}`}
+                  onClick={() => {
+                    if (item.type === "ticket") openTicket(item.ticket);
+                    if (item.type === "memo" && item.guestId) {
+                      dispatch({ type: "OPEN_GUEST_DETAIL", payload: { guestId: item.guestId, ticketId: item.memo.ticketId } });
+                    }
+                    if (item.type === "preference") {
+                      dispatch({ type: "OPEN_GUEST_DETAIL", payload: { guestId: item.guestId } });
+                    }
+                  }}
+                  className="min-h-16 rounded-md border bg-background/70 p-3 text-left text-sm hover:bg-secondary/40"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-4 text-primary" />
+                    <Badge variant={item.reason === "overdue" || item.reason === "urgent" ? "destructive" : "secondary"}>
+                      {item.reason.replaceAll("_", " ")}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 line-clamp-1 font-medium">{item.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{guest ? guestDisplayName(guest) : "Unfiled memo"}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {view === "list" ? (
         <div className="space-y-6">

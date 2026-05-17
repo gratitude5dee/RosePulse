@@ -12,6 +12,8 @@ import type {
   WalkiePreferenceSignal
 } from "@/lib/types";
 
+export const WALKIE_INTELLIGENCE_SCHEMA_VERSION = "guestpulse-v1";
+
 interface AnalyzeWalkieInput {
   transcript: string;
   guestId?: string;
@@ -61,6 +63,9 @@ export function analyzeWalkieTranscript(input: AnalyzeWalkieInput): WalkieIntell
   });
 
   return {
+    schemaVersion: WALKIE_INTELLIGENCE_SCHEMA_VERSION,
+    provider: "deterministic",
+    analysisStatus: "analyzed",
     category,
     priority: inferWalkiePriority(transcript),
     title: transcriptTitle(transcript),

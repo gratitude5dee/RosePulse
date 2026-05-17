@@ -303,6 +303,14 @@ export type Database = {
           signal_count: number;
           preference_categories: Database["public"]["Enums"]["preference_category"][];
           intelligence: Json;
+          analysis_provider: Database["public"]["Enums"]["walkie_analysis_provider"];
+          analysis_model: string | null;
+          analysis_version: string;
+          analysis_status: Database["public"]["Enums"]["voice_memo_analysis_status"];
+          analysis_error: string | null;
+          transcription_model: string | null;
+          duration_seconds: number | null;
+          transcribed_at: string | null;
           created_by: string | null;
           filed_by: string | null;
           created_at: string;
@@ -327,6 +335,14 @@ export type Database = {
           signal_count?: number;
           preference_categories?: Database["public"]["Enums"]["preference_category"][];
           intelligence?: Json;
+          analysis_provider?: Database["public"]["Enums"]["walkie_analysis_provider"];
+          analysis_model?: string | null;
+          analysis_version?: string;
+          analysis_status?: Database["public"]["Enums"]["voice_memo_analysis_status"];
+          analysis_error?: string | null;
+          transcription_model?: string | null;
+          duration_seconds?: number | null;
+          transcribed_at?: string | null;
           created_by?: string | null;
           filed_by?: string | null;
           created_at?: string;
@@ -375,6 +391,11 @@ export type Database = {
           status: Database["public"]["Enums"]["preference_status"];
           source_type: Database["public"]["Enums"]["preference_source_type"];
           dedupe_key: string | null;
+          privacy_sensitivity: Database["public"]["Enums"]["privacy_sensitivity"];
+          normalized_signal_key: string | null;
+          analysis_version: string;
+          last_seen_at: string;
+          review_note: string | null;
           embedding: string | null;
           created_at: string;
           updated_at: string;
@@ -392,6 +413,11 @@ export type Database = {
           status?: Database["public"]["Enums"]["preference_status"];
           source_type: Database["public"]["Enums"]["preference_source_type"];
           dedupe_key?: string | null;
+          privacy_sensitivity?: Database["public"]["Enums"]["privacy_sensitivity"];
+          normalized_signal_key?: string | null;
+          analysis_version?: string;
+          last_seen_at?: string;
+          review_note?: string | null;
           embedding?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -412,6 +438,9 @@ export type Database = {
           unfiled_voice_note_id: string | null;
           voice_note_memo_id: string | null;
           quote: string | null;
+          confidence: number | null;
+          privacy_sensitivity: Database["public"]["Enums"]["privacy_sensitivity"] | null;
+          analysis_version: string | null;
           created_at: string;
         };
         Insert: {
@@ -424,6 +453,9 @@ export type Database = {
           unfiled_voice_note_id?: string | null;
           voice_note_memo_id?: string | null;
           quote?: string | null;
+          confidence?: number | null;
+          privacy_sensitivity?: Database["public"]["Enums"]["privacy_sensitivity"] | null;
+          analysis_version?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["guest_preference_evidence"]["Insert"]>;
@@ -494,6 +526,34 @@ export type Database = {
         Args: { p_payload: Json };
         Returns: Json;
       };
+      rosepulse_create_ticket: {
+        Args: { p_payload: Json };
+        Returns: Json;
+      };
+      rosepulse_update_ticket_status: {
+        Args: { p_ticket_id: string; p_status: Database["public"]["Enums"]["ticket_status"]; p_body?: string | null };
+        Returns: Json;
+      };
+      rosepulse_escalate_ticket: {
+        Args: { p_ticket_id: string; p_note?: string | null };
+        Returns: Json;
+      };
+      rosepulse_add_ticket_comment: {
+        Args: { p_ticket_id: string; p_body: string };
+        Returns: Json;
+      };
+      rosepulse_assign_ticket: {
+        Args: { p_ticket_id: string; p_assigned_to: Database["public"]["Enums"]["staff_role"] };
+        Returns: Json;
+      };
+      rosepulse_set_ticket_priority: {
+        Args: { p_ticket_id: string; p_priority: Database["public"]["Enums"]["ticket_priority"] };
+        Returns: Json;
+      };
+      resolve_guest_preference: {
+        Args: { p_preference_id: string; p_status: Database["public"]["Enums"]["preference_status"]; p_note?: string | null };
+        Returns: Json;
+      };
     };
     Enums: {
       staff_role:
@@ -517,6 +577,9 @@ export type Database = {
       recommendation_status: "pending" | "accepted" | "dismissed";
       voice_note_memo_status: "unfiled" | "filed" | "attached" | "archived";
       voice_note_memo_source: "unfiled" | "new_ticket" | "ticket_attachment" | "filed_unfiled";
+      walkie_analysis_provider: "deterministic" | "openai";
+      voice_memo_analysis_status: "pending" | "analyzed" | "failed";
+      privacy_sensitivity: "low" | "medium" | "high";
     };
     CompositeTypes: Record<string, never>;
   };

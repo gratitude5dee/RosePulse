@@ -12,13 +12,28 @@ import { guestCrmReducer, type GuestCrmAction } from "@/lib/store/reducer";
 import type { GuestCrmState } from "@/lib/types";
 
 const fixturePreferences = createFixturePreferences(guestFixtures, ticketFixtures);
+const fixturePreferenceEvidence = fixturePreferences.flatMap((preference) =>
+  preference.evidenceIds.map((evidenceId) => ({
+    id: `pe_${preference.id}_${evidenceId}`,
+    preferenceId: preference.id,
+    ticketEventId: evidenceId.startsWith("t_") || evidenceId.startsWith("e_") ? evidenceId : undefined,
+    voiceNoteMemoId: evidenceId.startsWith("memo") ? evidenceId : undefined,
+    quote: preference.detail,
+    confidence: preference.confidence,
+    privacySensitivity: preference.privacySensitivity,
+    analysisVersion: preference.analysisVersion,
+    createdAt: preference.createdAt
+  }))
+);
 
 export const initialGuestCrmState: GuestCrmState = {
   guests: guestFixtures,
   tickets: ticketFixtures,
   staff: staffFixtures,
   preferences: fixturePreferences,
+  preferenceEvidence: fixturePreferenceEvidence,
   recommendations: createFixtureRecommendations(guestFixtures, fixturePreferences),
+  categoryFocus: "all",
   focusedGuestId: undefined,
   detailGuestId: undefined,
   focusedTicketId: undefined,

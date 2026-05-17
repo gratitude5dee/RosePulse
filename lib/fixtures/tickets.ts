@@ -113,6 +113,68 @@ export const ticketFixtures: Ticket[] = [
     dueInHours: 2
   }),
   makeTicket({
+    id: "t_radha_001",
+    guestId: "guest_radha_arora_demo",
+    category: "guest_relations",
+    title: "Prepare executive innovation arrival brief",
+    detail:
+      "Guest is reviewing how Rosewood Sand Hill expresses Silicon Valley sense of place. Concierge and manager should align on locally grounded details before late-afternoon arrival.",
+    priority: "high",
+    status: "in_progress",
+    ageHours: 1,
+    assignedTo: "concierge",
+    dueInHours: 1
+  }),
+  makeTicket({
+    id: "t_radha_002",
+    guestId: "guest_radha_arora_demo",
+    category: "room",
+    title: "Stage villa suite with local design cues",
+    detail:
+      "Add a concise card on residential architecture, garden views, and handcrafted details. Keep setup polished, uncluttered, and executive-discreet.",
+    priority: "high",
+    status: "open",
+    ageHours: 2,
+    assignedTo: "front_desk"
+  }),
+  makeTicket({
+    id: "t_radha_003",
+    guestId: "guest_radha_arora_demo",
+    category: "fnb",
+    title: "Curate Madera dining and mixology notes",
+    detail:
+      "Prepare a short, locally grounded dining and mixology brief with authentic cuisine options and no generic luxury language.",
+    priority: "high",
+    status: "open",
+    ageHours: 2,
+    assignedTo: "fnb_captain",
+    dueInHours: 4
+  }),
+  makeTicket({
+    id: "t_radha_004",
+    guestId: "guest_radha_arora_demo",
+    category: "spa",
+    title: "Hold Asaya nature-wellness window",
+    detail:
+      "Offer a locally inspired treatment or short nature walk only if schedule allows. Keep recommendation optional and time-aware.",
+    priority: "medium",
+    status: "open",
+    ageHours: 3,
+    assignedTo: "spa_supervisor"
+  }),
+  makeTicket({
+    id: "t_radha_005",
+    guestId: "guest_radha_arora_demo",
+    category: "security",
+    title: "Protect assistant and SMS protocol",
+    detail:
+      "Route updates through assistant or SMS, avoid public room callouts, and keep lobby movement discreet during the executive visit.",
+    priority: "medium",
+    status: "open",
+    ageHours: 1,
+    assignedTo: "security_lead"
+  }),
+  makeTicket({
     id: "t_8803",
     guestId: "g_0421",
     category: "fnb",

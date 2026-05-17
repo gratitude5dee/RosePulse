@@ -110,6 +110,9 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [transcriptionModel, setTranscriptionModel] = useState<string | undefined>();
+  const [transcribedAt, setTranscribedAt] = useState<string | undefined>();
+  const [lastRecordingDurationSeconds, setLastRecordingDurationSeconds] = useState<number | undefined>();
   const [permissionState, setPermissionState] = useState<WalkiePermissionState>("unknown");
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [interimTranscript, setInterimTranscript] = useState("");
@@ -286,6 +289,8 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
         }
 
         if (transcriptionRequestRef.current !== requestId) return;
+        setTranscriptionModel(payload.model);
+        setTranscribedAt(new Date().toISOString());
         setSegments((current) => [
           ...current,
           {
@@ -353,6 +358,9 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
         const mimeType = recorder.mimeType || recordedChunksRef.current[0]?.type || "audio/webm";
         const recording = new Blob(recordedChunksRef.current, { type: mimeType });
         recordedChunksRef.current = [];
+        if (startedAtRef.current) {
+          setLastRecordingDurationSeconds(Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)));
+        }
         stopAudio();
         if (shouldTranscribe) {
           void transcribeRecording(recording);
@@ -481,6 +489,9 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     lastRecordingRef.current = null;
     setIsTranscribing(false);
     setTranscriptionError(null);
+    setTranscriptionModel(undefined);
+    setTranscribedAt(undefined);
+    setLastRecordingDurationSeconds(undefined);
     setSegments([]);
     setInterimTranscript("");
   }, []);
@@ -525,6 +536,9 @@ export function useWalkie({ lang, onAutoStop }: UseWalkieOptions = {}) {
     isRecording,
     isTranscribing,
     transcriptionError,
+    transcriptionModel,
+    transcribedAt,
+    lastRecordingDurationSeconds,
     permissionState,
     segments,
     interimTranscript,

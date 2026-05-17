@@ -9,13 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { GuestCard } from "@/components/app/GuestCard";
 import { GuestAvatar } from "@/components/app/GuestAvatar";
+import { useWalkieUi } from "@/components/app/WalkieUiContext";
 import { CATEGORY_META, CATEGORY_ORDER } from "@/lib/categories";
 import { formatAge, formatGuestStatus, guestDisplayName } from "@/lib/format";
 import {
   selectAllGuests,
+  selectGuestHasCategoryWork,
   selectGuestLastActivity,
   selectOpenTicketCountByGuest,
-  selectTicketsByGuest
+  selectTicketsByGuest,
+  selectVoiceMemosByGuest
 } from "@/lib/store/selectors";
 import { useGuestCrm } from "@/lib/store/store-context";
 import type { Guest, GuestStatus, LoyaltyTier, TicketCategory } from "@/lib/types";
@@ -25,6 +28,7 @@ const loyalties: Array<LoyaltyTier | "all"> = ["all", "Standard", "Silver", "Gol
 
 export function GuestsView() {
   const { state, dispatch } = useGuestCrm();
+  const { openWalkie } = useWalkieUi();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<GuestStatus | "all">("all");
   const [loyaltyFilter, setLoyaltyFilter] = useState<LoyaltyTier | "all">("all");
@@ -32,7 +36,10 @@ export function GuestsView() {
   const [view, setView] = useState<"cards" | "table">("cards");
   const deferredSearch = useDeferredValue(search);
   const allTags = useMemo(() => Array.from(new Set(state.guests.flatMap((guest) => guest.tags))).toSorted(), [state.guests]);
-  const guests = selectAllGuests(state, { search: deferredSearch, statusFilter, tagFilter, loyaltyFilter });
+  const categoryFocus = state.categoryFocus;
+  const guests = selectAllGuests(state, { search: deferredSearch, statusFilter, tagFilter, loyaltyFilter }).filter((guest) =>
+    categoryFocus === "all" ? true : selectGuestHasCategoryWork(state, guest.id, categoryFocus)
+  );
 
   function openGuest(guest: Guest, ticketId?: string) {
     dispatch({ type: "OPEN_GUEST_DETAIL", payload: { guestId: guest.id, ticketId } });
@@ -40,6 +47,7 @@ export function GuestsView() {
 
   function talkToGuest(guest: Guest) {
     dispatch({ type: "SET_FOCUSED_GUEST", payload: { guestId: guest.id } });
+    openWalkie({ guestId: guest.id });
   }
 
   function addTicket(guest: Guest, category?: TicketCategory) {
@@ -47,7 +55,7 @@ export function GuestsView() {
   }
 
   return (
-    <div className="px-safe py-6 md:px-8">
+    <div className="px-safe py-4 md:px-8 md:py-6">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="display-1">Guests</h1>
@@ -133,6 +141,8 @@ export function GuestsView() {
               key={guest.id}
               guest={guest}
               tickets={selectTicketsByGuest(state, guest.id)}
+              voiceMemos={selectVoiceMemosByGuest(state, guest.id)}
+              focusedCategory={categoryFocus}
               onOpen={openGuest}
               onTalk={talkToGuest}
               onAddTicket={addTicket}

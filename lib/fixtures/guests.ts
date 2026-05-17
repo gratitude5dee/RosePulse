@@ -3,6 +3,37 @@ import { isoDateFromToday } from "@/lib/format";
 
 export const guestFixtures: Guest[] = [
   {
+    id: "guest_radha_arora_demo",
+    firstName: "Radha",
+    lastName: "Arora",
+    pronouns: "he/him",
+    avatarUrl: "/images/guests/radha-arora.webp",
+    loyaltyTier: "Founder",
+    vip: true,
+    arrivalDate: isoDateFromToday(0),
+    departureDate: isoDateFromToday(2),
+    status: "arriving_today",
+    roomNumber: "Villa 1",
+    roomType: "Villa Suite",
+    partySize: 1,
+    occasion: "business",
+    languages: ["en"],
+    homeCity: "Los Angeles area",
+    tags: [
+      "Sense of place",
+      "Design details and lighting",
+      "Dining and mixology",
+      "Wellness and nature",
+      "Security discreet movement",
+      "Assistant or SMS contact",
+      "High privacy sensitivity"
+    ],
+    notes:
+      "Fictional executive VIP demo profile based only on public professional and travel preference signals. " +
+      "Guest is on property for an executive hospitality innovation review and is likely to value discreet, polished service, " +
+      "exact property details, sense of place, local cultural expression, dining, wellness, and experiences that feel specific to Rosewood Sand Hill rather than generic luxury."
+  },
+  {
     id: "g_0421",
     firstName: "Arielle",
     lastName: "Laurent",
